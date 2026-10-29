@@ -1,0 +1,78 @@
+{
+  "mission_id": "wildlife_monitoring_corridor_01",
+  "planner_algorithm": "GA_2Opt_AStar",
+  "coordinate_convention": {
+    "frame": "ENU_ALT_UP",
+    "units": "metres",
+    "axes": {
+      "x": "East",
+      "y": "North",
+      "z": "Altitude_Positive_Up"
+    }
+  },
+  "validation": {
+    "is_valid": true,
+    "status": "SUCCESS",
+    "collision_free": true,
+    "altitude_bounds_ok": true,
+    "planning_time_sec": 1.42
+  },
+  "start_position": {
+    "x": 0.0,
+    "y": 0.0,
+    "z": 15.0
+  },
+  "destination": {
+    "x": 60.0,
+    "y": 50.0,
+    "z": 15.0
+  },
+  "monitoring_waypoints": [
+    {
+      "id": "WP_1",
+      "x": 20.0,
+      "y": 15.0,
+      "z": 16.0,
+      "zone_name": "Waterhole_Alpha",
+      "priority": 1
+    },
+    {
+      "id": "WP_2",
+      "x": 40.0,
+      "y": 10.0,
+      "z": 18.0,
+      "zone_name": "Ridge_Trail_East",
+      "priority": 2
+    },
+    {
+      "id": "WP_3",
+      "x": 45.0,
+      "y": 35.0,
+      "z": 16.0,
+      "zone_name": "Canopy_Clearing_North",
+      "priority": 1
+    }
+  ],
+  "intermediate_path_points": [
+    {"x": 0.0, "y": 0.0, "z": 15.0, "is_monitoring": false, "waypoint_id": "START"},
+    {"x": 10.0, "y": 8.0, "z": 15.5, "is_monitoring": false, "waypoint_id": null},
+    {"x": 20.0, "y": 15.0, "z": 16.0, "is_monitoring": true, "waypoint_id": "WP_1"},
+    {"x": 30.0, "y": 12.5, "z": 17.0, "is_monitoring": false, "waypoint_id": null},
+    {"x": 40.0, "y": 10.0, "z": 18.0, "is_monitoring": true, "waypoint_id": "WP_2"},
+    {"x": 42.5, "y": 22.5, "z": 17.0, "is_monitoring": false, "waypoint_id": null},
+    {"x": 45.0, "y": 35.0, "z": 16.0, "is_monitoring": true, "waypoint_id": "WP_3"},
+    {"x": 52.5, "y": 42.5, "z": 15.5, "is_monitoring": false, "waypoint_id": null},
+    {"x": 60.0, "y": 50.0, "z": 15.0, "is_monitoring": false, "waypoint_id": "DEST"}
+  ],
+  "static_obstacles": [
+    {"id": "OBS_TREE_1", "x": 14.0, "y": 11.0, "z": 15.5, "radius": 2.0},
+    {"id": "OBS_TOWER_2", "x": 35.0, "y": 12.0, "z": 17.5, "radius": 2.2},
+    {"id": "OBS_CANOPY_3", "x": 44.0, "y": 26.0, "z": 16.5, "radius": 2.0}
+  ],
+  "path_metrics": {
+    "planned_path_length_m": 88.62,
+    "num_monitoring_waypoints": 3,
+    "num_total_points": 9,
+    "estimated_planning_cost": 94.15
+  }
+}

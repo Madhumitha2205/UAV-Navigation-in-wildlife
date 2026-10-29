@@ -1,0 +1,82 @@
+{
+  "airsim": {
+    "ip": "127.0.0.1",
+    "port": 41451,
+    "vehicle_name": "SimpleFlight",
+    "lidar_sensor_name": "LidarSensor1",
+    "timeout_sec": 10.0,
+    "takeoff_altitude_m": 15.0,
+    "default_velocity_mps": 3.0
+  },
+  "coordinate_mapping": {
+    "planner_frame": "ENU_ALT_UP",
+    "airsim_frame": "NED",
+    "x_to_north": 0.0,
+    "y_to_north": 1.0,
+    "x_to_east": 1.0,
+    "y_to_east": 0.0,
+    "z_sign": -1.0,
+    "origin_ned": [0.0, 0.0, 0.0],
+    "origin_planner": [0.0, 0.0, 0.0],
+    "scale": 1.0,
+    "description": "Planner X=East, Y=North, Z=Altitude(+Up) in metres -> AirSim North=Y, East=X, Down=-Z"
+  },
+  "vehicle_limits": {
+    "max_velocity_xy_mps": 5.0,
+    "max_velocity_z_mps": 2.0,
+    "max_acceleration_mps2": 4.0,
+    "min_altitude_m": 2.0,
+    "max_altitude_m": 80.0
+  },
+  "control": {
+    "control_frequency_hz": 10.0,
+    "command_duration_sec": 0.25,
+    "waypoint_tolerance_m": 2.5,
+    "destination_tolerance_m": 2.0,
+    "max_mission_steps": 600,
+    "max_mission_time_sec": 180.0
+  },
+  "td3": {
+    "state_dim": 12,
+    "action_dim": 3,
+    "hidden_dim": 128,
+    "actor_lr": 0.0003,
+    "critic_lr": 0.0003,
+    "gamma": 0.99,
+    "tau": 0.005,
+    "policy_noise": 0.2,
+    "noise_clip": 0.5,
+    "policy_freq": 2,
+    "exploration_noise": 0.15,
+    "batch_size": 64,
+    "replay_buffer_size": 25000,
+    "warmup_steps": 256,
+    "seed": 42
+  },
+  "reward": {
+    "progress_weight": 3.0,
+    "waypoint_bonus": 25.0,
+    "completion_bonus": 80.0,
+    "collision_penalty": -100.0,
+    "proximity_penalty_weight": -4.0,
+    "proximity_threshold_m": 6.0,
+    "control_effort_weight": -0.05,
+    "jerk_penalty_weight": -0.08,
+    "step_penalty": -0.1,
+    "stationary_penalty": -0.5,
+    "stationary_speed_threshold_mps": 0.15
+  },
+  "curriculum": {
+    "episodes_per_stage": 30,
+    "promotion_success_rate": 0.7,
+    "min_episodes_before_promotion": 15,
+    "max_steps_per_episode": 200
+  },
+  "paths": {
+    "route_input_path": "configs/sample_global_route.json",
+    "checkpoint_dir": "models",
+    "default_checkpoint": "models/td3_wildlife_uav.pt",
+    "log_dir": "logs",
+    "output_dir": "outputs"
+  }
+}

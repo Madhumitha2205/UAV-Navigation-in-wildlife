@@ -1,0 +1,20 @@
+{
+  "safe_distance_m": 6.0,
+  "critical_distance_m": 2.5,
+  "collision_radius_m": 1.0,
+  "max_repulsion_speed_mps": 3.5,
+  "braking_gain": 0.85,
+  "vertical_clearance_boost_mps": 0.6,
+  "closing_speed_scale_mps": 5.0,
+  "sensor_invalid_fallback_speed_scale": 0.5,
+  "membership": {
+    "distance_critical_peak_m": 2.5,
+    "distance_near_center_m": 4.25,
+    "distance_safe_start_m": 6.0,
+    "closing_slow_max_mps": 0.5,
+    "closing_moderate_center_mps": 2.0,
+    "closing_fast_min_mps": 3.5
+  },
+  "intervention_threshold": 0.15,
+  "emergency_brake_threshold": 0.8
+}

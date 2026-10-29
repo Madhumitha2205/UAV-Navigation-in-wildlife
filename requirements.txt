@@ -1,0 +1,10 @@
+# Verified Python 3.11 dependencies for Part 2: TD3 Local Control, Fuzzy Safety, and AirSim Integration
+# Note: Install msgpack-rpc-python before installing airsim with --no-build-isolation --no-deps
+numpy==2.4.4
+torch==2.15.0+cpu
+matplotlib==3.10.9
+pytest==9.1.1
+msgpack-python==0.5.6
+msgpack-rpc-python==0.4.1
+tornado==4.5.3
+airsim==1.8.1
