@@ -1,3 +1,4 @@
+
 """Adaptive Fuzzy Logic (AFL) Safety Layer for Reactive UAV Obstacle Avoidance.
 
 Note on Research Integrity:
@@ -37,6 +38,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, asdict
 from typing import Any, Dict, Optional, Sequence, Tuple
+
 import numpy as np
 
 from backend.intelligent_control.airsim_sensors import ObstacleObservation
@@ -46,6 +48,7 @@ from backend.intelligent_control.config import SafetyConfig, VehicleLimitsConfig
 @dataclass
 class SafetyInterventionResult:
     """Structured output returned by the Adaptive Fuzzy Logic Safety Layer."""
+
     original_action: Tuple[float, float, float]
     danger_level: float
     closest_obstacle_distance_m: float
@@ -178,8 +181,13 @@ class AdaptiveFuzzySafetyLayer:
 
         # Ensure critical distance strictly triggers high danger floor even if receding
         if distance_m <= self.cfg.critical_distance_m:
-            penetration = (self.cfg.critical_distance_m - distance_m) / max(self.cfg.critical_distance_m, 1e-6)
-            danger = max(danger, min(1.0, 0.80 + 0.20 * max(0.0, penetration)))
+            penetration = (
+                self.cfg.critical_distance_m - distance_m
+            ) / max(self.cfg.critical_distance_m, 1e-6)
+            danger = max(
+                danger,
+                min(1.0, 0.80 + 0.20 * max(0.0, penetration)),
+            )
 
         diagnostics = {
             "mu_d_critical": d_mem["critical"],
@@ -189,6 +197,7 @@ class AdaptiveFuzzySafetyLayer:
             "mu_v_moderate": v_mem["moderate"],
             "mu_v_fast": v_mem["fast"],
         }
+
         return float(np.clip(danger, 0.0, 1.0)), diagnostics
 
     def filter_action(
@@ -199,6 +208,7 @@ class AdaptiveFuzzySafetyLayer:
     ) -> SafetyInterventionResult:
         """Filter the TD3-proposed velocity command through the Adaptive Fuzzy Logic safety layer."""
         raw_action = np.asarray(td3_action_xyz, dtype=np.float64)
+
         if raw_action.shape != (3,) or not np.all(np.isfinite(raw_action)):
             # Malformed action input -> emergency zero velocity
             return SafetyInterventionResult(
@@ -231,17 +241,23 @@ class AdaptiveFuzzySafetyLayer:
                 danger_level=0.5,
                 closest_obstacle_distance_m=float("nan"),
                 intervened=True,
-                final_action=(float(caution_action[0]), float(caution_action[1]), float(caution_action[2])),
+                final_action=(
+                    float(caution_action[0]),
+                    float(caution_action[1]),
+                    float(caution_action[2]),
+                ),
                 reason="Sensor observation missing or invalid; cautious speed reduction applied.",
                 rule_memberships={},
             )
 
         dist = float(obstacle_obs.closest_distance_m)
         rep_vec = np.asarray(obstacle_obs.repulsion_unit_xyz, dtype=np.float64)
+
         if not np.all(np.isfinite(rep_vec)):
             rep_vec = np.zeros(3, dtype=np.float64)
 
         rep_norm = float(np.linalg.norm(rep_vec))
+
         if rep_norm > 1e-6:
             rep_unit = rep_vec / rep_norm
             unit_to_obs = -rep_unit
@@ -259,12 +275,17 @@ class AdaptiveFuzzySafetyLayer:
         # Case 2: Clear surroundings (outside safe distance and low danger)
         if dist >= self.cfg.safe_distance_m and danger < self.cfg.intervention_threshold:
             was_clipped = not np.allclose(raw_action, clipped_td3, atol=1e-5)
+
             return SafetyInterventionResult(
                 original_action=orig_tuple,
                 danger_level=danger,
                 closest_obstacle_distance_m=dist,
                 intervened=False,
-                final_action=(float(clipped_td3[0]), float(clipped_td3[1]), float(clipped_td3[2])),
+                final_action=(
+                    float(clipped_td3[0]),
+                    float(clipped_td3[1]),
+                    float(clipped_td3[2]),
+                ),
                 reason="Clear surroundings; TD3 command passed through."
                 if not was_clipped
                 else "Clear surroundings; TD3 command clipped to vehicle speed limits.",
@@ -274,29 +295,45 @@ class AdaptiveFuzzySafetyLayer:
         # Case 3: Active Fuzzy Safety Intervention (Near or Critical proximity)
         # Project out any velocity component of TD3 action that points toward the obstacle
         approaching_comp = float(np.dot(clipped_td3, unit_to_obs))
+
         if approaching_comp > 0.0:
             # Remove inward velocity proportional to danger (full removal in high/critical danger)
             removal_factor = min(1.0, danger * 1.25)
-            safe_tangent_td3 = clipped_td3 - ( removal_factor * approaching_comp * unit_to_obs )
+            safe_tangent_td3 = (
+                clipped_td3
+                - removal_factor * approaching_comp * unit_to_obs
+            )
         else:
             safe_tangent_td3 = clipped_td3.copy()
 
-        # Construct lateral tangent + repulsion escape direction so UAV steers around and away from obstacle
-        horiz_to_obs = np.array([unit_to_obs[0], unit_to_obs[1], 0.0], dtype=np.float64)
+        # Construct lateral tangent + repulsion escape direction
+        horiz_to_obs = np.array(
+            [unit_to_obs[0], unit_to_obs[1], 0.0],
+            dtype=np.float64,
+        )
         horiz_norm = float(np.linalg.norm(horiz_to_obs))
+
         if horiz_norm > 1e-5:
-            # Consistent counter-clockwise (left-hand) horizontal tangent around obstacle
-            t1 = np.array([-horiz_to_obs[1], horiz_to_obs[0], 0.0], dtype=np.float64) / horiz_norm
+            # Select the tangent that best aligns with the TD3 movement direction
+            t1 = np.array(
+                [-horiz_to_obs[1], horiz_to_obs[0], 0.0],
+                dtype=np.float64,
+            ) / horiz_norm
             t2 = -t1
-            dot_diff = float(np.dot(clipped_td3, t1) - np.dot(clipped_td3, t2))
-            lateral_tangent = t1 if dot_diff >= -1.5 else t2
+            dot_diff = float(
+                np.dot(clipped_td3, t1) - np.dot(clipped_td3, t2)
+            )
+
+            # Modification 2: remove the previous -1.5 selection bias
+            lateral_tangent = t1 if dot_diff >= 0.0 else t2
         else:
             lateral_tangent = np.array([0.0, 1.0, 0.0], dtype=np.float64)
 
         # Combine direct radial repulsion with lateral steering and gentle upward clearance boost
         evasive_dir = 0.50 * rep_unit + 0.50 * lateral_tangent
-        evasive_dir[2] += 0.12  # slight upward bias for canopy/ground clearance
+        evasive_dir[2] += 0.12
         evasive_norm = float(np.linalg.norm(evasive_dir))
+
         if evasive_norm > 1e-6:
             evasive_dir = evasive_dir / evasive_norm
 
@@ -304,34 +341,53 @@ class AdaptiveFuzzySafetyLayer:
         safety_velocity = evasive_dir * repulsion_speed
 
         # Blend between TD3 tangent-filtered command and active evasive repulsion command
-        if dist <= self.cfg.critical_distance_m or danger >= self.cfg.emergency_brake_threshold:
-            # Critical proximity override: strong braking of inward motion + direct radial/lateral repulsion
+        if (
+            dist <= self.cfg.critical_distance_m
+            or danger >= self.cfg.emergency_brake_threshold
+        ):
+            # Critical proximity override: retain existing emergency behavior
             blend_alpha = max(0.75, danger)
-            # In critical proximity, prioritize pure radial repulsion away from the obstacle
             crit_dir = 0.80 * rep_unit + 0.20 * lateral_tangent
             crit_dir /= max(float(np.linalg.norm(crit_dir)), 1e-6)
             crit_vel = crit_dir * float(self.cfg.max_repulsion_speed_mps)
-            blended = (1.0 - blend_alpha) * safe_tangent_td3 + blend_alpha * crit_vel
+
+            blended = (
+                (1.0 - blend_alpha) * safe_tangent_td3
+                + blend_alpha * crit_vel
+            )
+
             reason = (
-                f"CRITICAL obstacle proximity (d={dist:.2f}m <= {self.cfg.critical_distance_m:.2f}m, "
-                f"danger={danger:.2f}): emergency braking and repulsive evasion applied."
+                f"CRITICAL obstacle proximity (d={dist:.2f}m <= "
+                f"{self.cfg.critical_distance_m:.2f}m, danger={danger:.2f}): "
+                "emergency braking and repulsive evasion applied."
             )
         else:
-            # Near proximity: keep forward tangent progress while adding repulsive lateral clearance
+            # Modification 3: scale the near-proximity safety command by blend_alpha
             blend_alpha = 0.50 * danger
-            blended = (1.0 - blend_alpha) * safe_tangent_td3 + safety_velocity
+
+            blended = (
+                (1.0 - blend_alpha) * safe_tangent_td3
+                + blend_alpha * safety_velocity
+            )
+
             reason = (
-                f"NEAR obstacle hazard (d={dist:.2f}m < {self.cfg.safe_distance_m:.2f}m, "
-                f"danger={danger:.2f}): blended TD3 command with fuzzy repulsive steering."
+                f"NEAR obstacle hazard (d={dist:.2f}m < "
+                f"{self.cfg.safe_distance_m:.2f}m, danger={danger:.2f}): "
+                "blended TD3 command with fuzzy repulsive steering."
             )
 
         final_cmd = np.clip(blended, -self.max_vel, self.max_vel)
+
         return SafetyInterventionResult(
             original_action=orig_tuple,
             danger_level=danger,
             closest_obstacle_distance_m=dist,
             intervened=True,
-            final_action=(float(final_cmd[0]), float(final_cmd[1]), float(final_cmd[2])),
+            final_action=(
+                float(final_cmd[0]),
+                float(final_cmd[1]),
+                float(final_cmd[2]),
+            ),
             reason=reason,
             rule_memberships=memberships,
         )

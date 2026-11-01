@@ -155,7 +155,7 @@ class MotionController:
                 td3_aligned = raw_td3
 
             obs_dist = obstacle_obs.closest_distance_m if obstacle_obs.is_valid else 30.0
-            if obs_dist < self.safety_cfg.safe_distance_m:
+            if obs_dist < self.safety_cfg.safe_distance_m and not self.use_safety_layer:
                 rep = np.asarray(obstacle_obs.repulsion_unit_xyz, dtype=np.float64)
                 rep_norm = float(np.linalg.norm(rep))
                 if rep_norm > 1e-6:
