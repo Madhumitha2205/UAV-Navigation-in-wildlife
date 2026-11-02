@@ -1,169 +1,158 @@
-"""Main Entry Point for TD3 Local UAV Navigation, Adaptive Fuzzy Safety, and AirSim Integration.
+﻿#!/usr/bin/env python3
+"""Main entry point for UAV Global Route Planning Backend.
 
-Supported explicit modes (`--mode`):
-- `train`    : Train the TD3 agent in the lightweight 3D kinematic environment (no AirSim required).
-- `dry-run`  : Validate route JSON, coordinate transforms, and controller execution locally without moving AirSim.
-- `evaluate` : Run multi-seed comparative evaluation (Config A: Baseline, Config B: TD3, Config C: TD3+Fuzzy)
-               and generate CSV logs and Matplotlib summary plots.
-- `airsim`   : Connect to a live AirSim multirotor server and execute a saved, trained TD3 policy with Fuzzy Safety.
-               Never runs silently—requires explicit `--mode airsim` and a trained checkpoint.
+Executes Genetic Algorithm with 2-Opt and Obstacle-Aware A* pathfinding.
+Exports route to AirSim integration JSON and generates visualization plots.
 """
 
 from __future__ import annotations
 
 import argparse
-import json
+import os
 import sys
+import time
 from pathlib import Path
 
-from backend.intelligent_control.config import load_controller_config, load_safety_config
-from backend.intelligent_control.curriculum import run_curriculum_training
-from backend.intelligent_control.evaluation import ComparativeEvaluator
-from backend.intelligent_control.logging_utils import save_csv_records, save_json_report, setup_logger
-from backend.intelligent_control.mission_runner import MissionRunner
-from backend.intelligent_control.route_loader import load_global_route
-from backend.intelligent_control.td3_agent import TD3Agent
+# Add project root to sys.path so backend package is importable
+PROJECT_ROOT = Path(__file__).resolve().parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from backend.global_planner.config import PlannerConfig
+from backend.global_planner.planner_service import GlobalPlannerService, PlannedRoute
 
 
-def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Intelligent Hierarchical UAV Navigation - Part 2: TD3 Local Control, Fuzzy Safety & AirSim"
+        description="UAV Global Route Planning Backend (GA + 2-Opt + A*)",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
-        "--mode",
+        "--config",
+        "-c",
         type=str,
-        required=True,
-        choices=["train", "dry-run", "evaluate", "airsim"],
-        help="Execution mode: train | dry-run | evaluate | airsim",
+        default="configs/default_environment.json",
+        help="Path to JSON environment configuration file",
     )
     parser.add_argument(
-        "--controller-config",
+        "--output-dir",
+        "-o",
         type=str,
-        default="configs/controller_config.json",
-        help="Path to controller_config.json",
+        default="outputs",
+        help="Directory to save generated JSON route and plots",
     )
     parser.add_argument(
-        "--safety-config",
-        type=str,
-        default="configs/safety_config.json",
-        help="Path to safety_config.json",
+        "--no-plots",
+        action="store_true",
+        help="Disable Matplotlib visualization plot generation",
     )
-    parser.add_argument(
-        "--route",
-        type=str,
-        default=None,
-        help="Override path to global route JSON file",
-    )
-    parser.add_argument(
-        "--checkpoint",
-        type=str,
-        default=None,
-        help="Override path to TD3 model checkpoint (.pt)",
-    )
-    parser.add_argument(
-        "--episodes",
-        type=int,
-        default=None,
-        help="Number of training episodes for --mode train",
-    )
-    parser.add_argument(
-        "--seeds",
-        type=int,
-        nargs="+",
-        default=[101, 102, 103, 104, 105],
-        help="Random seeds for --mode evaluate",
-    )
-    return parser.parse_args(argv)
+    return parser.parse_args()
 
 
-def main(argv: list[str] | None = None) -> int:
-    args = parse_args(argv)
-    ctrl_cfg = load_controller_config(args.controller_config)
-    safety_cfg = load_safety_config(args.safety_config)
+def main() -> int:
+    args = parse_arguments()
 
-    log_dir = Path(ctrl_cfg.paths.log_dir)
-    logger = setup_logger("main", log_file=log_dir / "execution.log")
+    config_path = Path(args.config)
+    if not config_path.is_absolute():
+        config_path = PROJECT_ROOT / config_path
 
-    route_path = args.route or ctrl_cfg.paths.route_input_path
-    ckpt_path = Path(args.checkpoint or ctrl_cfg.paths.default_checkpoint)
+    if not config_path.exists():
+        print(f"[ERROR] Configuration file not found: {config_path}", file=sys.stderr)
+        return 1
 
-    if args.mode == "train":
-        logger.info("Starting TD3 curriculum training in lightweight 3D kinematic environment...")
-        res = run_curriculum_training(
-            controller_config=ctrl_cfg,
-            safety_config=safety_cfg,
-            total_episodes=args.episodes,
-            save_path=ckpt_path,
-        )
-        logger.info("Training complete. Summary: %s", json.dumps(res["summary"]))
-        print(json.dumps(res["summary"], indent=2))
-        return 0
+    print("=" * 70)
+    print("   UAV GLOBAL ROUTE PLANNING BACKEND: GA + 2-OPT + A*")
+    print("   Hierarchical Navigation Framework for Wildlife Monitoring")
+    print("=" * 70)
+    print(f"Loading configuration from: {config_path}")
 
-    # Load and validate global route for dry-run, evaluate, or airsim modes
-    route = load_global_route(route_path)
-    logger.info(
-        "Loaded validated global route '%s' with %d monitoring waypoints and %d path points.",
-        route.mission_id,
-        len(route.monitoring_waypoints),
-        len(route.intermediate_path_points),
-    )
+    try:
+        config = PlannerConfig.from_json_file(config_path)
+    except Exception as e:
+        print(f"[FATAL] Failed to parse configuration: {e}", file=sys.stderr)
+        return 1
 
-    agent = TD3Agent(td3_config=ctrl_cfg.td3, limits_config=ctrl_cfg.vehicle_limits)
-    if not ckpt_path.exists():
-        raise FileNotFoundError(
-            f"Trained TD3 checkpoint not found at '{ckpt_path}'. Run `--mode train` first."
-        )
-    agent.load_checkpoint(ckpt_path)
-    agent.set_eval_mode(True)
-    if not agent.is_trained:
-        raise RuntimeError(f"Checkpoint '{ckpt_path}' is marked as untrained. Refusing policy execution.")
+    # Override options from CLI arguments
+    if args.output_dir:
+        config.output_directory = args.output_dir
+    if args.no_plots:
+        config.export_plots = False
 
-    if args.mode == "dry-run":
-        logger.info("Running simulation-free dry-run validation of route and TD3+Fuzzy controller...")
-        runner = MissionRunner(ctrl_cfg, safety_cfg, td3_agent=agent)
-        mission_res = runner.run_mission(
-            route=route,
-            nav_mode="TD3_WITH_FUZZY_SAFETY",
-            execution_backend="kinematic",
-            include_dynamic_obstacles=True,
-            seed=ctrl_cfg.td3.seed,
-            process_noise_std_mps=0.0,
-        )
-        summary = mission_res.to_summary_dict()
-        save_json_report(log_dir / "dry_run_result.json", summary)
-        if mission_res.intervention_logs:
-            save_csv_records(log_dir / "dry_run_fuzzy_interventions.csv", mission_res.intervention_logs)
-        logger.info("Dry-run completed: success=%s, reason=%s", mission_res.success, mission_res.termination_reason)
-        print(json.dumps(summary, indent=2))
-        return 0
+    output_dir = Path(config.output_directory)
+    if not output_dir.is_absolute():
+        output_dir = PROJECT_ROOT / output_dir
+    output_dir.mkdir(parents=True, exist_ok=True)
+    config.output_directory = str(output_dir)
 
-    if args.mode == "evaluate":
-        logger.info("Running comparative evaluation across Configurations A, B, and C...")
-        evaluator = ComparativeEvaluator(ctrl_cfg, safety_cfg, td3_agent=agent)
-        report = evaluator.run_comparative_experiments(route=route, seeds=args.seeds)
-        logger.info("Evaluation completed. Artifacts saved to %s", json.dumps(report["artifacts"]))
-        print(json.dumps(report, indent=2))
-        return 0
+    print("\n--- Mission Environment Parameters ---")
+    print(f"Map Bounds: [{config.environment.x_min}, {config.environment.x_max}] x [{config.environment.y_min}, {config.environment.y_max}]")
+    print(f"Start Position: ({config.environment.start.x}, {config.environment.start.y}) alt={config.environment.start.altitude}m")
+    print(f"Destination:    ({config.environment.destination.x}, {config.environment.destination.y}) alt={config.environment.destination.altitude}m")
+    print(f"Safety Clearance: {config.environment.safety_clearance} meters")
+    print(f"Grid Resolution:  {config.environment.grid_resolution} meters")
+    print(f"Obstacles: {len(config.environment.circular_obstacles)} circular, {len(config.environment.rectangular_obstacles)} rectangular, {len(config.environment.dynamic_obstacles)} dynamic snapshots")
+    print(f"Configured Waypoints: {len(config.environment.monitoring_waypoints)}")
 
-    if args.mode == "airsim":
-        logger.info(
-            "Explicit AirSim execution mode requested. Connecting to %s:%d...",
-            ctrl_cfg.airsim.ip,
-            ctrl_cfg.airsim.port,
-        )
-        runner = MissionRunner(ctrl_cfg, safety_cfg, td3_agent=agent)
-        mission_res = runner.run_mission(
-            route=route,
-            nav_mode="TD3_WITH_FUZZY_SAFETY",
-            execution_backend="airsim",
-            include_dynamic_obstacles=True,
-        )
-        summary = mission_res.to_summary_dict()
-        save_json_report(log_dir / "airsim_mission_result.json", summary)
-        print(json.dumps(summary, indent=2))
-        return 0
+    print("\n--- Optimization Hyperparameters ---")
+    print(f"Population Size: {config.genetic_algorithm.population_size}")
+    print(f"Max Generations: {config.genetic_algorithm.max_generations}")
+    print(f"Crossover Rate:  {config.genetic_algorithm.crossover_probability} (Order Crossover)")
+    print(f"Mutation Rate:   {config.genetic_algorithm.mutation_probability} (Swap/Inversion)")
+    print(f"2-Opt Refinement: Every {config.genetic_algorithm.two_opt_frequency} gens on top {int(config.genetic_algorithm.two_opt_candidate_ratio*100)}%")
+    print(f"Random Seed:     {config.genetic_algorithm.random_seed}")
 
-    return 1
+    service = GlobalPlannerService(config)
+
+    print("\n[INFO] Initializing environment and obstacle-aware A* path precomputation...")
+    env = service.generate_environment(config.environment)
+
+    print("[INFO] Executing GA evolution with 2-Opt local search...")
+    route: PlannedRoute = service.plan_route(env, config)
+
+    # Export route JSON
+    json_path = output_dir / "planned_route.json"
+    service.export_route(route, json_path)
+    print(f"[SUCCESS] Exported route contract to: {json_path}")
+
+    # Print Results
+    print("\n" + "=" * 70)
+    print("                     PLANNING RESULTS SUMMARY")
+    print("=" * 70)
+    print(f"Status:                      {route.status.upper()}")
+    print(f"Independent Validation:      {'PASSED' if route.validation.is_valid else 'FAILED'}")
+    print(f"Total Path Length:           {route.metrics.path_length:.2f} meters")
+    print(f"Waypoint Coverage:           {route.metrics.coverage_percentage:.1f}% ({route.metrics.visited_waypoints}/{route.metrics.required_waypoints})")
+    print(f"Obstacle Collision Count:    {route.metrics.collision_count}")
+    min_clear = route.metrics.minimum_obstacle_clearance
+    print(f"Minimum Obstacle Clearance:  {min_clear:.2f} m" if min_clear is not None else "Minimum Obstacle Clearance:  N/A")
+    print(f"Planning Runtime:            {route.metrics.planning_time_seconds:.3f} seconds")
+    print(f"Generations Completed:       {route.metrics.generations_completed}")
+    print(f"2-Opt Improvements:          {route.metrics.two_opt_improvements}")
+    print(f"Total Waypoint Path Points:  {len(route.path_points)}")
+
+    if route.ordered_monitoring_waypoints:
+        print("\nOptimal Waypoint Visit Order:")
+        for wp in route.ordered_monitoring_waypoints:
+            print(f"  Step {wp['order']:2d}: {wp['id']:25s} at ({wp['x']:6.2f}, {wp['y']:6.2f})")
+
+    if route.validation.errors:
+        print("\n[VALIDATION ERRORS]:")
+        for err in route.validation.errors:
+            print(f"  - {err}")
+
+    if route.validation.warnings:
+        print("\n[VALIDATION WARNINGS]:")
+        for warn in route.validation.warnings:
+            print(f"  - {warn}")
+
+    if config.export_plots and route.status == "success":
+        print(f"\nGenerated Plots:")
+        print(f"  - Route Trajectory: {output_dir / 'optimized_route.png'}")
+        print(f"  - Fitness History:  {output_dir / 'fitness_history.png'}")
+
+    print("=" * 70)
+
+    return 0 if route.status == "success" else 2
 
 
 if __name__ == "__main__":

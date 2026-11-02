@@ -1,28 +1,25 @@
-# Byte-compiled / optimized / DLL files
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
+*.so
+.Python
 
 # Virtual environments
 .venv/
 venv/
 env/
 
-# Pytest cache
+# Build and test artifacts
 .pytest_cache/
-.coverage
+build/
+dist/
+*.egg-info/
 
-# Generated models, logs, and outputs (keep directory placeholders if any)
-models/*.pt
-models/*.pth
-models/*.json
-logs/*.csv
-logs/*.json
-logs/*.log
-outputs/*.png
-outputs/*.csv
-outputs/*.json
+# IDE and editor files
+.vscode/
+.idea/
 
-# OS generated files
+# OS files
 .DS_Store
 Thumbs.db
