@@ -51,8 +51,8 @@ class ControlLoopConfig:
     command_duration_sec: float = 0.25
     waypoint_tolerance_m: float = 2.5
     destination_tolerance_m: float = 2.0
-    max_mission_steps: int = 600
-    max_mission_time_sec: float = 180.0
+    max_mission_steps: int = 1500
+    max_mission_time_sec: float = 300.0
 
 
 @dataclass
@@ -99,7 +99,7 @@ class CurriculumConfig:
 
 @dataclass
 class PathsConfig:
-    route_input_path: str = "configs/sample_global_route.json"
+    route_input_path: str = "outputs/controller_route.json"
     checkpoint_dir: str = "models"
     default_checkpoint: str = "models/td3_wildlife_uav.pt"
     log_dir: str = "logs"

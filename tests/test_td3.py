@@ -129,3 +129,27 @@ def test_lightweight_env_state_dimensions_and_termination():
         if done:
             break
     assert info["completed_mission"] is True
+
+
+def test_missing_td3_checkpoint_handling(tmp_path: Path, capsys):
+    """Verify that missing TD3 checkpoint prints helpful training instructions and refuses execution."""
+    import td3_main
+
+    agent = TD3Agent(td3_config=TD3Config(), limits_config=VehicleLimitsConfig())
+    with pytest.raises(FileNotFoundError, match="TD3 checkpoint not found"):
+        agent.load_checkpoint(tmp_path / "missing_checkpoint.pt")
+
+    exit_code = td3_main.main(
+        [
+            "--mode",
+            "dry-run",
+            "--route",
+            "configs/sample_global_route.json",
+            "--checkpoint",
+            str(tmp_path / "missing_checkpoint.pt"),
+        ]
+    )
+    assert exit_code == 1
+    captured = capsys.readouterr()
+    assert "Trained TD3 checkpoint not found" in captured.err
+    assert "--mode train" in captured.err

@@ -106,3 +106,60 @@ def test_out_of_bounds_point_fails(base_env):
     report = validator.validate_route(ordered_waypoints=wps, path_points=path_points)
     assert report.is_valid is False
     assert any("outside environment boundaries" in e for e in report.errors)
+
+
+def test_discontinuous_segment_step_fails(base_env):
+    """Verify that a path with a discontinuous jump exceeding max_segment_step is rejected."""
+    validator = RouteValidator(base_env)
+    wps = base_env.monitoring_waypoints
+    path_points = [
+        (5.0, 5.0),
+        (20.0, 20.0),
+        (80.0, 20.0),  # 60m jump when max_segment_step=2.0
+        (80.0, 80.0),
+        (95.0, 95.0),
+    ]
+    report = validator.validate_route(
+        ordered_waypoints=wps,
+        path_points=path_points,
+        max_segment_step=2.0,
+    )
+    assert report.is_valid is False
+    assert any("has discontinuous jump" in e for e in report.errors)
+
+
+def test_reported_path_length_mismatch_fails(base_env):
+    """Verify that inaccurate reported path length fails validation."""
+    validator = RouteValidator(base_env)
+    wps = base_env.monitoring_waypoints
+    path_points = [
+        (5.0, 5.0),
+        (20.0, 20.0),
+        (80.0, 20.0),
+        (80.0, 80.0),
+        (95.0, 95.0),
+    ]
+    report = validator.validate_route(
+        ordered_waypoints=wps,
+        path_points=path_points,
+        reported_path_length=999.9,
+    )
+    assert report.is_valid is False
+    assert any("Reported path length" in e for e in report.errors)
+
+
+def test_waypoint_missing_from_path_geometry_fails(base_env):
+    """Verify that listing a waypoint in ordered_waypoints without visiting its coordinates in path_points fails."""
+    validator = RouteValidator(base_env)
+    wps = base_env.monitoring_waypoints
+    # Path skips wp2 (80, 20) physically even though wps includes it
+    path_points = [
+        (5.0, 5.0),
+        (20.0, 20.0),
+        (20.0, 80.0),
+        (80.0, 80.0),
+        (95.0, 95.0),
+    ]
+    report = validator.validate_route(ordered_waypoints=wps, path_points=path_points)
+    assert report.is_valid is False
+    assert any("does not appear in sequence along path_points" in e for e in report.errors)

@@ -23,3 +23,11 @@ dist/
 # OS files
 .DS_Store
 Thumbs.db
+# Runtime logs and temporary files
+logs/
+*.log
+outputs/.mplconfig/
+outputs/__pycache__/
+
+# Python and plotting caches
+.mplconfig/

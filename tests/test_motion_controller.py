@@ -92,3 +92,108 @@ def test_optional_live_airsim_connection():
     state = client.get_kinematic_state()
     assert isinstance(state.north, float)
     client.land_and_release()
+
+
+def test_baseline_full_route_completion_kinematic(tmp_path):
+    """Verify that the BASELINE kinematic mission completes all 6 monitoring waypoints and reaches the destination."""
+    from backend.global_planner.config import PlannerConfig
+    from backend.global_planner.planner_service import GlobalPlannerService
+    from backend.intelligent_control.mission_runner import MissionRunner
+    from backend.intelligent_control.route_loader import load_global_route
+
+    p_cfg = PlannerConfig.from_json_file("configs/default_environment.json")
+    p_cfg.export_plots = False
+    service = GlobalPlannerService(p_cfg)
+    env = service.generate_environment(p_cfg.environment)
+    planned = service.plan_route(env, p_cfg)
+    ctrl_route_path = tmp_path / "controller_route.json"
+    service.export_controller_route(planned, ctrl_route_path, environment=env)
+
+    route = load_global_route(ctrl_route_path)
+    ctrl_cfg = ControllerConfig()
+    safety_cfg = SafetyConfig()
+    runner = MissionRunner(ctrl_cfg, safety_cfg, td3_agent=None)
+
+    res = runner.run_mission(
+        route=route,
+        nav_mode="BASELINE",
+        execution_backend="kinematic",
+        include_dynamic_obstacles=False,
+        seed=42,
+        process_noise_std_mps=0.0,
+    )
+    assert res.success is True
+    assert res.termination_reason == "SUCCESS_COMPLETED"
+    assert res.reached_final_destination is True
+    assert res.monitoring_waypoints_reached == 6
+    assert res.monitoring_waypoints_total == 6
+    assert res.monitoring_coverage_ratio == 1.0
+    assert res.collision_count == 0
+    assert res.final_distance_to_destination_m <= ctrl_cfg.control.destination_tolerance_m
+    assert res.visited_monitoring_waypoints == [w.waypoint_id for w in route.monitoring_waypoints]
+
+
+def test_timeout_handling_when_step_budget_too_small():
+    """Verify that MissionRunner reports MAX_STEPS_TIMEOUT and success=False if step limit is exhausted."""
+    from backend.intelligent_control.mission_runner import MissionRunner
+    from backend.intelligent_control.route_loader import load_global_route
+
+    route = load_global_route("configs/sample_global_route.json")
+    ctrl_cfg = ControllerConfig()
+    ctrl_cfg.control.max_mission_steps = 10
+    safety_cfg = SafetyConfig()
+    runner = MissionRunner(ctrl_cfg, safety_cfg, td3_agent=None)
+
+    res = runner.run_mission(
+        route=route,
+        nav_mode="BASELINE",
+        execution_backend="kinematic",
+        include_dynamic_obstacles=False,
+        seed=42,
+    )
+    assert res.success is False
+    assert res.termination_reason == "MAX_STEPS_TIMEOUT"
+    assert res.reached_final_destination is False
+
+
+def test_airsim_cleanup_called_on_exception(monkeypatch):
+    """Verify that _run_airsim_mission always calls land_and_release() in its finally block even on exception."""
+    from backend.intelligent_control.mission_runner import MissionRunner
+    from backend.intelligent_control.route_loader import load_global_route
+
+    cleanup_called = {"count": 0}
+
+    class DummyFailedAirSimClient:
+        def __init__(self, config=None):
+            self.config = config
+
+        def connect(self):
+            pass
+
+        def reset_vehicle(self):
+            pass
+
+        def enable_api_control(self):
+            pass
+
+        def arm_and_takeoff(self, altitude_m=None):
+            raise RuntimeError("Simulated mid-takeoff RPC error")
+
+        def land_and_release(self):
+            cleanup_called["count"] += 1
+
+    monkeypatch.setattr("backend.intelligent_control.mission_runner.AirSimUAVClient", DummyFailedAirSimClient)
+
+    route = load_global_route("configs/sample_global_route.json")
+    ctrl_cfg = ControllerConfig()
+    safety_cfg = SafetyConfig()
+    runner = MissionRunner(ctrl_cfg, safety_cfg, td3_agent=None)
+
+    with pytest.raises(RuntimeError, match="Simulated mid-takeoff RPC error"):
+        runner.run_mission(
+            route=route,
+            nav_mode="BASELINE",
+            execution_backend="airsim",
+            include_dynamic_obstacles=False,
+        )
+    assert cleanup_called["count"] == 1

@@ -164,8 +164,9 @@ class GlobalPlannerService:
         # Step 6: Reconstruct Full Continuous Path Geometry
         ordered_waypoints: List[Waypoint] = []
         path_points_2d: List[Tuple[float, float]] = []
+        segment_errors: List[str] = []
 
-        if ga_result.success:
+        if ga_result.best_chromosome is not None:
             for idx in ga_result.best_chromosome:
                 ordered_waypoints.append(fitness_calc.waypoints[idx])
 
@@ -179,31 +180,54 @@ class GlobalPlannerService:
             for i in range(len(node_sequence) - 1):
                 n_from = node_sequence[i]
                 n_to = node_sequence[i + 1]
+                expected_from = fitness_calc.node_positions[n_from]
+                expected_to = fitness_calc.node_positions[n_to]
                 seg_result = fitness_calc.get_segment_path(n_from, n_to)
 
-                if seg_result.success and seg_result.path_points:
-                    # Append points without duplicating the connection junction
-                    if not path_points_2d:
-                        path_points_2d.extend(seg_result.path_points)
-                    else:
-                        path_points_2d.extend(seg_result.path_points[1:])
+                if not seg_result.success or len(seg_result.path_points) < 2:
+                    segment_errors.append(
+                        f"Segment {i} (node {n_from} {expected_from} -> node {n_to} {expected_to}) is infeasible: "
+                        f"{seg_result.error_message or 'empty path'}"
+                    )
+                    break
+
+                actual_seg_start = seg_result.path_points[0]
+                actual_seg_end = seg_result.path_points[-1]
+                if math.hypot(actual_seg_start[0] - expected_from[0], actual_seg_start[1] - expected_from[1]) > 1e-3:
+                    segment_errors.append(
+                        f"Segment {i} start mismatch: expected {expected_from}, got {actual_seg_start}."
+                    )
+                    break
+                if math.hypot(actual_seg_end[0] - expected_to[0], actual_seg_end[1] - expected_to[1]) > 1e-3:
+                    segment_errors.append(
+                        f"Segment {i} end mismatch: expected {expected_to}, got {actual_seg_end}."
+                    )
+                    break
+
+                if not path_points_2d:
+                    path_points_2d.extend(seg_result.path_points)
                 else:
-                    # Infeasible segment
-                    p_from = fitness_calc.node_positions[n_from]
-                    p_to = fitness_calc.node_positions[n_to]
-                    if not path_points_2d:
-                        path_points_2d.extend([p_from, p_to])
-                    else:
-                        path_points_2d.append(p_to)
+                    prev_junction = path_points_2d[-1]
+                    if math.hypot(prev_junction[0] - actual_seg_start[0], prev_junction[1] - actual_seg_start[1]) > 1e-3:
+                        segment_errors.append(
+                            f"Discontinuous segment join at segment {i}: previous end {prev_junction} != segment start {actual_seg_start}."
+                        )
+                        break
+                    path_points_2d.extend(seg_result.path_points[1:])
 
         # Step 7: Independent Route Validation
+        max_step_allowed = environment.grid_resolution * math.sqrt(2.0) * 1.5
         validator = RouteValidator(environment)
         validation_report = validator.validate_route(
             ordered_waypoints=ordered_waypoints,
             path_points=path_points_2d,
-            reported_path_length=ga_result.best_cost if ga_result.success else None,
+            reported_path_length=ga_result.best_cost if (ga_result.success and not segment_errors) else None,
             required_waypoints=monitoring_wps,
+            max_segment_step=max_step_allowed,
         )
+        if segment_errors:
+            validation_report.errors = segment_errors + validation_report.errors
+            validation_report.is_valid = False
 
         elapsed_time = time.time() - start_time
 
@@ -230,19 +254,8 @@ class GlobalPlannerService:
             two_opt_improvements=ga_result.two_opt_improvements,
         )
 
-        # Build AirSim contract formatted points with altitude
+        # Build AirSim contract formatted points with altitude and monitoring metadata
         default_alt = environment.default_altitude
-        formatted_path_points: List[Dict[str, Any]] = []
-        for idx, pt in enumerate(path_points_2d):
-            formatted_path_points.append(
-                {
-                    "point_index": idx,
-                    "x": round(pt[0], 4),
-                    "y": round(pt[1], 4),
-                    "altitude": round(default_alt, 2),
-                }
-            )
-
         formatted_wps: List[Dict[str, Any]] = []
         for idx, wp in enumerate(ordered_waypoints):
             formatted_wps.append(
@@ -253,6 +266,48 @@ class GlobalPlannerService:
                     "y": round(wp.y, 4),
                     "altitude": round(wp.altitude, 2),
                     "importance_weight": round(wp.importance_weight, 4),
+                    "is_mandatory": bool(wp.is_mandatory),
+                }
+            )
+
+        # Match ordered monitoring waypoints to their sequential positions along path_points_2d
+        wp_point_map: Dict[int, Waypoint] = {}
+        search_idx = 0
+        for wp in ordered_waypoints:
+            for p_idx in range(search_idx, len(path_points_2d)):
+                if math.hypot(path_points_2d[p_idx][0] - wp.x, path_points_2d[p_idx][1] - wp.y) <= 1e-2:
+                    wp_point_map[p_idx] = wp
+                    search_idx = p_idx
+                    break
+
+        formatted_path_points: List[Dict[str, Any]] = []
+        for idx, pt in enumerate(path_points_2d):
+            matched_wp = wp_point_map.get(idx)
+            if matched_wp is not None:
+                alt = matched_wp.altitude
+                is_mon = True
+                wp_id: Optional[str] = matched_wp.id
+            elif idx == 0:
+                alt = environment.start.altitude
+                is_mon = False
+                wp_id = "START"
+            elif idx == len(path_points_2d) - 1:
+                alt = environment.destination.altitude
+                is_mon = False
+                wp_id = "DEST"
+            else:
+                alt = default_alt
+                is_mon = False
+                wp_id = None
+
+            formatted_path_points.append(
+                {
+                    "point_index": idx,
+                    "x": round(pt[0], 4),
+                    "y": round(pt[1], 4),
+                    "altitude": round(alt, 2),
+                    "is_monitoring": is_mon,
+                    "waypoint_id": wp_id,
                 }
             )
 
@@ -322,6 +377,7 @@ class GlobalPlannerService:
             path_points=pts,
             reported_path_length=route.metrics.path_length,
             required_waypoints=environment.monitoring_waypoints,
+            max_segment_step=environment.grid_resolution * math.sqrt(2.0) * 1.5,
         )
 
     def export_route(
@@ -334,4 +390,62 @@ class GlobalPlannerService:
         out_file.parent.mkdir(parents=True, exist_ok=True)
         with open(out_file, "w", encoding="utf-8") as f:
             json.dump(route.to_dict(), f, indent=2)
+        return out_file
+
+    def export_controller_route(
+        self,
+        route: PlannedRoute,
+        output_path: str | Path,
+        environment: Optional[Environment] = None,
+        mission_id: str = "wildlife_monitoring_generated_route",
+    ) -> Path:
+        """Convert and export a validated PlannedRoute into the Part 2 Controller Route JSON schema.
+
+        Authoritative planner output: `planned_route.json`
+        Controller input contract: `controller_route.json`
+        """
+        from backend.intelligent_control.route_loader import convert_planned_route_dict_to_controller_dict, load_global_route
+
+        env_obs: List[Dict[str, Any]] = []
+        if environment is not None:
+            from backend.global_planner.obstacle_manager import CircularObstacle, RectangularObstacle
+
+            default_z = float(environment.default_altitude)
+            for obs in environment.obstacle_manager.obstacles:
+                if isinstance(obs, CircularObstacle):
+                    env_obs.append(
+                        {
+                            "id": obs.id,
+                            "x": round(obs.x, 4),
+                            "y": round(obs.y, 4),
+                            "z": round(default_z, 2),
+                            "radius": round(obs.radius, 4),
+                        }
+                    )
+                elif isinstance(obs, RectangularObstacle):
+                    cx = 0.5 * (obs.x_min + obs.x_max)
+                    cy = 0.5 * (obs.y_min + obs.y_max)
+                    r = 0.5 * math.hypot(obs.x_max - obs.x_min, obs.y_max - obs.y_min)
+                    env_obs.append(
+                        {
+                            "id": obs.id,
+                            "x": round(cx, 4),
+                            "y": round(cy, 4),
+                            "z": round(default_z, 2),
+                            "radius": round(r, 4),
+                        }
+                    )
+
+        ctrl_dict = convert_planned_route_dict_to_controller_dict(
+            route.to_dict(),
+            mission_id=mission_id,
+            static_obstacles=env_obs,
+        )
+        out_file = Path(output_path)
+        out_file.parent.mkdir(parents=True, exist_ok=True)
+        with open(out_file, "w", encoding="utf-8") as f:
+            json.dump(ctrl_dict, f, indent=2)
+
+        # Immediately verify the exported file passes strict controller schema validation
+        load_global_route(out_file)
         return out_file

@@ -16,10 +16,10 @@
     "x_to_east": 1.0,
     "y_to_east": 0.0,
     "z_sign": -1.0,
-    "origin_ned": [0.0, 0.0, 0.0],
+    "origin_ned": [0.0, 0.0, -18.0],
     "origin_planner": [0.0, 0.0, 0.0],
     "scale": 1.0,
-    "description": "Planner X=East, Y=North, Z=Altitude(+Up) in metres -> AirSim North=Y, East=X, Down=-Z"
+    "description": "Planner X=East, Y=North, Z=Altitude(+Up) in metres -> AirSim North=Y, East=X, Down=-Z + origin_ned[2] (-18m reference datum above Blocks courtyard)"
   },
   "vehicle_limits": {
     "max_velocity_xy_mps": 5.0,
@@ -33,8 +33,8 @@
     "command_duration_sec": 0.25,
     "waypoint_tolerance_m": 2.5,
     "destination_tolerance_m": 2.0,
-    "max_mission_steps": 600,
-    "max_mission_time_sec": 180.0
+    "max_mission_steps": 1500,
+    "max_mission_time_sec": 300.0
   },
   "td3": {
     "state_dim": 12,
@@ -73,7 +73,7 @@
     "max_steps_per_episode": 200
   },
   "paths": {
-    "route_input_path": "configs/sample_global_route.json",
+    "route_input_path": "outputs/controller_route.json",
     "checkpoint_dir": "models",
     "default_checkpoint": "models/td3_wildlife_uav.pt",
     "log_dir": "logs",

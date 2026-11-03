@@ -43,6 +43,7 @@ class RouteValidator:
         path_points: Sequence[Tuple[float, float]],
         reported_path_length: Optional[float] = None,
         required_waypoints: Optional[Sequence[Waypoint]] = None,
+        max_segment_step: Optional[float] = None,
     ) -> ValidationReport:
         """Validate a generated UAV route independently of GA fitness evaluations.
 
@@ -50,11 +51,12 @@ class RouteValidator:
         1. Non-empty path and valid finite coordinates (no NaN or Inf).
         2. Start endpoint matches environment start (within 1e-3).
         3. Destination endpoint matches environment destination (within 1e-3).
-        4. Every required monitoring waypoint is present exactly once in ordered_waypoints.
+        4. Every required monitoring waypoint is present in ordered_waypoints and visited in order along path_points.
         5. All path points lie strictly within map boundaries.
         6. Continuous collision freedom: all path segments do not intersect obstacles or clearance buffer.
-        7. Minimum obstacle clearance is >= configured safety clearance (with numerical tolerance).
-        8. Reported path length matches actual reconstructed Euclidean segment sum (within tolerance).
+        7. Segment continuity: consecutive path points do not jump across unstepped gaps when max_segment_step is set.
+        8. Minimum obstacle clearance is >= configured safety clearance (with numerical tolerance).
+        9. Reported path length matches actual reconstructed Euclidean segment sum (within tolerance).
         """
         errors: List[str] = []
         warnings: List[str] = []
@@ -94,7 +96,7 @@ class RouteValidator:
                 f"Path destination {dest_pt} does not match environment destination {expected_dest} (diff={dist_dest:.4f})."
             )
 
-        # 4. Mandatory waypoint coverage and uniqueness
+        # 4. Mandatory waypoint coverage, uniqueness, and ordered presence along path_points
         expected_wp_ids = [wp.id for wp in req_wps if wp.is_mandatory]
         visited_wp_ids = [wp.id for wp in ordered_waypoints]
 
@@ -105,6 +107,24 @@ class RouteValidator:
         missing_ids = set(expected_wp_ids) - set(visited_wp_ids)
         if missing_ids:
             errors.append(f"Required mandatory waypoints not visited: {sorted(list(missing_ids))}")
+
+        # Verify each ordered waypoint is actually reached in sequence along path_points
+        search_idx = 0
+        waypoint_path_indices: List[int] = []
+        for wp in ordered_waypoints:
+            found_at = -1
+            for p_idx in range(search_idx, len(path_points)):
+                if math.hypot(path_points[p_idx][0] - wp.x, path_points[p_idx][1] - wp.y) <= 1e-2:
+                    found_at = p_idx
+                    search_idx = p_idx
+                    break
+            if found_at == -1:
+                errors.append(
+                    f"Ordered monitoring waypoint '{wp.id}' at ({wp.x:.2f}, {wp.y:.2f}) does not appear in sequence along path_points."
+                )
+            else:
+                waypoint_path_indices.append(found_at)
+        details["waypoint_path_indices"] = waypoint_path_indices
 
         # 5. Boundary constraints for all path points
         out_of_bounds_count = 0
@@ -119,14 +139,27 @@ class RouteValidator:
         if out_of_bounds_count > 3:
             errors.append(f"... and {out_of_bounds_count - 3} more points outside boundaries.")
 
-        # 6. Obstacle collisions and clearance along continuous segments
+        # 6. Obstacle collisions, clearance, and segment continuity along continuous segments
         collision_count = 0
+        discontinuity_count = 0
+        max_observed_step = 0.0
         min_clearance = float("inf")
 
         # Sample path finely to detect any segment-obstacle collisions
         for i in range(len(path_points) - 1):
             p1 = path_points[i]
             p2 = path_points[i + 1]
+            seg_len = math.hypot(p2[0] - p1[0], p2[1] - p1[1])
+            if seg_len > max_observed_step:
+                max_observed_step = seg_len
+
+            if max_segment_step is not None and seg_len > max_segment_step + 1e-4:
+                discontinuity_count += 1
+                if discontinuity_count <= 3:
+                    errors.append(
+                        f"Path segment {i} ({p1} -> {p2}) has discontinuous jump of {seg_len:.2f}m "
+                        f"(max allowed step={max_segment_step:.2f}m)."
+                    )
 
             # Direct segment collision check against obstacles + clearance
             if self.env.obstacle_manager.segment_collides(p1, p2, clearance=self.env.safety_clearance):
@@ -137,7 +170,6 @@ class RouteValidator:
                     )
 
             # Measure continuous minimum clearance
-            seg_len = math.hypot(p2[0] - p1[0], p2[1] - p1[1])
             samples = max(2, int(math.ceil(seg_len / 0.5)))
             for s in range(samples + 1):
                 t = s / samples
@@ -147,6 +179,8 @@ class RouteValidator:
                 if dist < min_clearance:
                     min_clearance = dist
 
+        if discontinuity_count > 3:
+            errors.append(f"... and {discontinuity_count - 3} more discontinuous path segments.")
         if collision_count > 3:
             errors.append(f"... and {collision_count - 3} more segments violating clearance.")
 
@@ -154,8 +188,10 @@ class RouteValidator:
             min_clearance if math.isfinite(min_clearance) else None
         )
         details["collision_count"] = collision_count
+        details["discontinuity_count"] = discontinuity_count
+        details["max_segment_step_m"] = max_observed_step
 
-        # 7. Check minimum clearance against configured threshold with slight numerical tolerance
+        # 8. Check minimum clearance against configured threshold with slight numerical tolerance
         if min_clearance < self.env.safety_clearance - 0.05:
             # If not already flagged by segment_collides
             if collision_count == 0:
@@ -164,7 +200,7 @@ class RouteValidator:
                     f"configured safety clearance ({self.env.safety_clearance})."
                 )
 
-        # 8. Reconstruct true continuous path length and compare
+        # 9. Reconstruct true continuous path length and compare
         actual_length = 0.0
         for i in range(len(path_points) - 1):
             p1 = path_points[i]
@@ -175,10 +211,10 @@ class RouteValidator:
         if reported_path_length is not None:
             details["reported_path_length"] = reported_path_length
             diff = abs(actual_length - reported_path_length)
-            if diff > 1.0:
-                warnings.append(
-                    f"Reported path length ({reported_path_length:.2f}) differs from actual "
-                    f"path length ({actual_length:.2f}) by {diff:.2f} meters."
+            if diff > 1e-2:
+                errors.append(
+                    f"Reported path length ({reported_path_length:.4f}) differs from actual "
+                    f"exported path length ({actual_length:.4f}) by {diff:.4f} meters."
                 )
 
         details["visited_waypoints_count"] = len(ordered_waypoints)

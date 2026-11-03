@@ -88,9 +88,10 @@ class AirSimSensorReader:
             if len(pts) == 0:
                 return None
             norms = np.linalg.norm(pts, axis=1)
-            valid_range = (norms > 0.05) & (norms <= self.max_lidar_range_m)
+            # Filter out vehicle rotor/frame self-hits (<1.5m) and downward ground/rooftop returns (z_ned > 1.5m below UAV)
+            valid_range = (norms > 1.5) & (norms <= self.max_lidar_range_m) & (pts[:, 2] <= 1.5)
             pts = pts[valid_range]
-            return pts if len(pts) > 0 else None
+            return pts
         except Exception as exc:
             logger.debug("LiDAR sensor '%s' unavailable or unconfigured: %s", self.config.lidar_sensor_name, exc)
             return None

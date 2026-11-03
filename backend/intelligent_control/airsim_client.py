@@ -68,14 +68,36 @@ class AirSimUAVClient:
                 raise AirSimConnectionError(
                     f"AirSim server at {self.config.ip}:{self.config.port} did not respond to ping."
                 )
+            vehicles = self._client.listVehicles()
+            if self.config.vehicle_name not in vehicles:
+                raise AirSimConnectionError(
+                    f"Configured vehicle '{self.config.vehicle_name}' not found in AirSim vehicles: {vehicles}"
+                )
             self._connected = True
-            logger.info("Connected to AirSim server at %s:%d", self.config.ip, self.config.port)
+            logger.info(
+                "Connected to AirSim server at %s:%d (vehicle='%s' verified in %s)",
+                self.config.ip,
+                self.config.port,
+                self.config.vehicle_name,
+                vehicles,
+            )
         except Exception as exc:
             self._connected = False
             self._client = None
             raise AirSimConnectionError(
                 f"Failed to connect to AirSim simulator at {self.config.ip}:{self.config.port}: {exc}"
             ) from exc
+
+    def reset_vehicle(self) -> None:
+        """Reset the simulated vehicle to its initial spawn state before starting a mission."""
+        self._require_connection()
+        try:
+            self._client.reset()
+            self._api_control_enabled = False
+            self._armed = False
+            logger.info("Reset vehicle '%s' to home spawn position.", self.config.vehicle_name)
+        except Exception as exc:
+            logger.warning("Failed to reset AirSim vehicle: %s", exc)
 
     def enable_api_control(self) -> None:
         """Enable API control for the configured vehicle."""
@@ -95,6 +117,8 @@ class AirSimUAVClient:
 
         target_alt = float(altitude_m if altitude_m is not None else self.config.takeoff_altitude_m)
         target_down = -abs(target_alt)
+        climb_vel = max(3.0, float(self.config.default_velocity_mps))
+        climb_timeout = max(float(self.config.timeout_sec), abs(target_alt) / 1.5 + 10.0)
         try:
             self._client.armDisarm(True, vehicle_name=self.config.vehicle_name)
             self._armed = True
@@ -104,11 +128,11 @@ class AirSimUAVClient:
             ).join()
             self._client.moveToZAsync(
                 z=target_down,
-                velocity=min(2.0, self.config.default_velocity_mps),
-                timeout_sec=self.config.timeout_sec,
+                velocity=climb_vel,
+                timeout_sec=climb_timeout,
                 vehicle_name=self.config.vehicle_name,
             ).join()
-            logger.info("Vehicle '%s' armed and reached altitude %.2f m", self.config.vehicle_name, target_alt)
+            logger.info("Vehicle '%s' armed and reached altitude %.2f m (NED Down=%.2f m)", self.config.vehicle_name, target_alt, target_down)
         except Exception as exc:
             raise AirSimConnectionError(f"Failed during arm_and_takeoff: {exc}") from exc
 
@@ -133,6 +157,37 @@ class AirSimUAVClient:
             )
         except Exception as exc:
             raise AirSimConnectionError(f"Failed to retrieve UAV kinematic state: {exc}") from exc
+
+    def move_to_position_ned(
+        self,
+        north: float,
+        east: float,
+        down: float,
+        velocity: Optional[float] = None,
+        timeout_sec: Optional[float] = None,
+    ) -> None:
+        """Move the multirotor to a target NED position (metres) and wait for completion."""
+        self._require_connection()
+        vel = float(velocity if velocity is not None else self.config.default_velocity_mps)
+        t_out = float(timeout_sec if timeout_sec is not None else max(15.0, self.config.timeout_sec))
+        try:
+            self._client.moveToPositionAsync(
+                x=float(north),
+                y=float(east),
+                z=float(down),
+                velocity=vel,
+                timeout_sec=t_out,
+                vehicle_name=self.config.vehicle_name,
+            ).join()
+            logger.info(
+                "Vehicle '%s' moved to NED position (%.2f, %.2f, %.2f) m",
+                self.config.vehicle_name,
+                north,
+                east,
+                down,
+            )
+        except Exception as exc:
+            raise AirSimConnectionError(f"Failed during move_to_position_ned: {exc}") from exc
 
     def move_by_velocity_ned(
         self,
@@ -159,7 +214,7 @@ class AirSimUAVClient:
 
     def hover_and_stop(self) -> None:
         """Command immediate zero-velocity hover for controlled stopping."""
-        if not self._connected or self._client is None:
+        if not self._connected or self._client is None or not self._api_control_enabled:
             return
         try:
             self._client.moveByVelocityAsync(
@@ -178,11 +233,12 @@ class AirSimUAVClient:
         if not self._connected or self._client is None:
             return
         try:
-            self.hover_and_stop()
-            self._client.landAsync(
-                timeout_sec=self.config.timeout_sec,
-                vehicle_name=self.config.vehicle_name,
-            ).join()
+            if self._api_control_enabled and self._armed:
+                self.hover_and_stop()
+                self._client.landAsync(
+                    timeout_sec=self.config.timeout_sec,
+                    vehicle_name=self.config.vehicle_name,
+                ).join()
         except Exception as exc:
             logger.warning("Exception while landing vehicle: %s", exc)
         finally:

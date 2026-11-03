@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """Main entry point for UAV Global Route Planning Backend.
 
 Executes Genetic Algorithm with 2-Opt and Obstacle-Aware A* pathfinding.
@@ -109,10 +109,21 @@ def main() -> int:
     print("[INFO] Executing GA evolution with 2-Opt local search...")
     route: PlannedRoute = service.plan_route(env, config)
 
-    # Export route JSON
+    # Export authoritative planner route JSON
     json_path = output_dir / "planned_route.json"
     service.export_route(route, json_path)
-    print(f"[SUCCESS] Exported route contract to: {json_path}")
+    print(f"[SUCCESS] Exported authoritative planner route to: {json_path}")
+
+    # Automatically convert and export controller-compatible route JSON if valid
+    ctrl_json_path = output_dir / "controller_route.json"
+    if route.status == "success" and route.validation.is_valid:
+        service.export_controller_route(route, ctrl_json_path, environment=env)
+        print(f"[SUCCESS] Exported validated controller route to: {ctrl_json_path}")
+    else:
+        print(
+            f"[WARNING] Skipping controller route export because planned route is invalid (status={route.status}).",
+            file=sys.stderr,
+        )
 
     # Print Results
     print("\n" + "=" * 70)

@@ -252,8 +252,8 @@ class GridPathfinder:
             raw_points.append((wx, wy))
         raw_points.append(goal_pt)
 
-        # Smooth / simplify colinear points
-        simplified_points = self._simplify_path(raw_points)
+        # Smooth / simplify colinear points (optionally configurable; keep grid step resolution intact)
+        simplified_points = self._simplify_path(raw_points, max_segment_length=self.grid_res * 1.5)
 
         # Compute total continuous path length
         path_length = 0.0
@@ -272,10 +272,14 @@ class GridPathfinder:
             self._path_cache[key] = res
         return res
 
-    def _simplify_path(self, points: List[Tuple[float, float]]) -> List[Tuple[float, float]]:
-        """Remove redundant intermediate points that are collinear."""
+    def _simplify_path(
+        self,
+        points: List[Tuple[float, float]],
+        max_segment_length: Optional[float] = None,
+    ) -> List[Tuple[float, float]]:
+        """Remove redundant intermediate points that are collinear without creating long jumps."""
         if len(points) <= 2:
-            return points
+            return list(points)
 
         result = [points[0]]
         for i in range(1, len(points) - 1):
@@ -291,7 +295,14 @@ class GridPathfinder:
             # Also ensure vectors point in same direction (dot > 0)
             dot = v1[0] * v2[0] + v1[1] * v2[1]
 
-            if abs(cross) > 1e-6 or dot <= 0:
+            # Check if skipping p_curr would exceed max_segment_length
+            exceeds_max_len = False
+            if max_segment_length is not None and max_segment_length > 0.0:
+                span_if_skipped = math.hypot(p_next[0] - p_prev[0], p_next[1] - p_prev[1])
+                if span_if_skipped > max_segment_length + 1e-6:
+                    exceeds_max_len = True
+
+            if abs(cross) > 1e-6 or dot <= 0 or exceeds_max_len:
                 result.append(p_curr)
 
         result.append(points[-1])

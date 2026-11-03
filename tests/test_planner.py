@@ -117,3 +117,44 @@ def test_failure_reported_on_impossible_environment():
     assert route.status == "failure"
     assert route.validation.is_valid is False
     assert len(route.validation.errors) > 0
+
+
+def test_continuous_route_geometry_no_large_jumps():
+    """Regression test: exported route must have continuous grid steps (no 35m/54m jumps) and exact length."""
+    import math
+
+    cfg = PlannerConfig.from_json_file("configs/default_environment.json")
+    cfg.export_plots = False
+    service = GlobalPlannerService(cfg)
+    env = service.generate_environment(cfg.environment)
+    route = service.plan_route(env, cfg)
+
+    assert route.status == "success"
+    pts = route.path_points
+    assert len(pts) > 200  # Dense 1m grid steps rather than stripped collinear endpoints
+
+    max_allowed_step = cfg.environment.grid_resolution * 1.6
+    computed_len = 0.0
+    for i in range(len(pts) - 1):
+        step_dist = math.hypot(pts[i + 1]["x"] - pts[i]["x"], pts[i + 1]["y"] - pts[i]["y"])
+        assert step_dist <= max_allowed_step, (
+            f"Discontinuous step {step_dist:.2f}m between index {i} ({pts[i]}) and {i+1} ({pts[i+1]})"
+        )
+        computed_len += step_dist
+
+    assert abs(computed_len - route.metrics.path_length) < 0.05
+
+
+def test_failed_astar_segment_does_not_fallback_to_straight_line():
+    """Verify that if an A* segment fails during reconstruction, no straight-line fallback is inserted."""
+    cfg = PlannerConfig.from_json_file("configs/default_environment.json")
+    cfg.export_plots = False
+    service = GlobalPlannerService(cfg)
+    env = service.generate_environment(cfg.environment)
+    # Enclose waypoint salt_lick_echo (55, 85) inside a box wall so A* segment to it fails
+    env.obstacle_manager.add_rectangular_obstacle("box_around_echo", 50.0, 60.0, 80.0, 90.0)
+
+    route = service.plan_route(env, cfg)
+    assert route.status == "failure"
+    assert route.validation.is_valid is False
+    assert any("is infeasible" in err for err in route.validation.errors)

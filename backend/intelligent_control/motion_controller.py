@@ -32,6 +32,7 @@ class ControlStepOutput:
     target_pos_xyz: Tuple[float, float, float]
     distance_to_target_m: float
     reached_waypoint: bool
+    newly_reached_monitoring_ids: List[str]
     mission_completed: bool
     proposed_action_xyz: Tuple[float, float, float]
     final_action_xyz: Tuple[float, float, float]
@@ -108,7 +109,16 @@ class MotionController:
         if dist < 1e-6:
             return np.zeros(3, dtype=np.float64)
         direction = rel / dist
-        desired_speed = min(self.limits.max_velocity_xy_mps * 0.85, max(1.0, 0.75 * dist))
+        # Decelerate proportionally when approaching the final destination;
+        # do not artificially brake at every 1m intermediate grid point.
+        final_wp = self.route_points[-1]
+        dist_to_dest = float(
+            np.linalg.norm(np.array([final_wp.x, final_wp.y, final_wp.z], dtype=np.float64) - uav_pos_xyz)
+        )
+        desired_speed = min(
+            self.limits.max_velocity_xy_mps * 0.85,
+            max(1.0, 0.75 * dist_to_dest),
+        )
         vel = direction * desired_speed
         return np.clip(vel, -self.max_vel, self.max_vel)
 
@@ -142,8 +152,12 @@ class MotionController:
         dist = float(np.linalg.norm(rel))
         if dist > 1e-6:
             dir_to_target = rel / dist
+            final_wp = self.route_points[-1]
+            dist_to_dest = float(
+                np.linalg.norm(np.array([final_wp.x, final_wp.y, final_wp.z], dtype=np.float64) - uav_pos_xyz)
+            )
             nominal_vel = np.clip(
-                dir_to_target * min(self.limits.max_velocity_xy_mps * 0.90, max(1.5, 0.85 * dist)),
+                dir_to_target * min(self.limits.max_velocity_xy_mps * 0.90, max(1.5, 0.85 * dist_to_dest)),
                 -self.max_vel,
                 self.max_vel,
             )
@@ -184,6 +198,7 @@ class MotionController:
 
         # Advance waypoint if current target is within tolerance
         reached_wp = False
+        newly_reached_mon: List[str] = []
         while self.current_wp_idx < len(self.route_points):
             wp = self.route_points[self.current_wp_idx]
             target_vec = np.array([wp.x, wp.y, wp.z], dtype=np.float64)
@@ -194,10 +209,10 @@ class MotionController:
                 if is_last
                 else self.cfg.control.waypoint_tolerance_m
             )
-            # Also advance intermediate (non-monitoring) path points if an obstacle is near the path point
-            # or if the UAV has already bypassed the segment and is closer to the next point.
+            # Also advance intermediate (non-monitoring) path points ONLY when safety layer is active
+            # and an obstacle is near the path point causing an evasive detour.
             bypass_advance = False
-            if not is_last and not wp.is_monitoring:
+            if not is_last and not wp.is_monitoring and self.use_safety_layer:
                 next_wp = self.route_points[self.current_wp_idx + 1]
                 next_vec = np.array([next_wp.x, next_wp.y, next_wp.z], dtype=np.float64)
                 seg_vec = next_vec - target_vec
@@ -209,6 +224,7 @@ class MotionController:
                 reached_wp = True
                 if wp.is_monitoring and wp.waypoint_id and wp.waypoint_id not in self.reached_monitoring_ids:
                     self.reached_monitoring_ids.append(wp.waypoint_id)
+                    newly_reached_mon.append(wp.waypoint_id)
                 self.current_wp_idx += 1
             else:
                 break
@@ -234,6 +250,7 @@ class MotionController:
                     np.linalg.norm(np.array([final_wp.x, final_wp.y, final_wp.z]) - pos)
                 ),
                 reached_waypoint=True,
+                newly_reached_monitoring_ids=newly_reached_mon,
                 mission_completed=True,
                 proposed_action_xyz=(0.0, 0.0, 0.0),
                 final_action_xyz=(0.0, 0.0, 0.0),
@@ -302,6 +319,7 @@ class MotionController:
             target_pos_xyz=(active_wp.x, active_wp.y, active_wp.z),
             distance_to_target_m=dist_to_target,
             reached_waypoint=reached_wp,
+            newly_reached_monitoring_ids=newly_reached_mon,
             mission_completed=False,
             proposed_action_xyz=(float(proposed[0]), float(proposed[1]), float(proposed[2])),
             final_action_xyz=final_tuple,

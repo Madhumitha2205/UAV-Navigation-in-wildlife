@@ -1,0 +1,39 @@
+{
+  "checkpoint_file": "td3_wildlife_uav.pt",
+  "total_it": 21735,
+  "trained_episodes": 150,
+  "is_trained": true,
+  "td3_config": {
+    "state_dim": 12,
+    "action_dim": 3,
+    "hidden_dim": 128,
+    "actor_lr": 0.0003,
+    "critic_lr": 0.0003,
+    "gamma": 0.99,
+    "tau": 0.005,
+    "policy_noise": 0.2,
+    "noise_clip": 0.5,
+    "policy_freq": 2,
+    "exploration_noise": 0.15,
+    "batch_size": 64,
+    "replay_buffer_size": 25000,
+    "warmup_steps": 256,
+    "seed": 42
+  },
+  "limits_config": {
+    "max_velocity_xy_mps": 5.0,
+    "max_velocity_z_mps": 2.0,
+    "max_acceleration_mps2": 4.0,
+    "min_altitude_m": 2.0,
+    "max_altitude_m": 80.0
+  },
+  "extra_metadata": {
+    "total_episodes": 150,
+    "total_steps": 21798,
+    "final_curriculum_stage": 5,
+    "overall_success_rate": 0.2667,
+    "final_20_episodes_success_rate": 0.0,
+    "overall_collision_rate": 0.1467,
+    "training_wall_time_sec": 284.508
+  }
+}

@@ -46,6 +46,9 @@ class MissionResult:
     monitoring_waypoints_reached: int
     monitoring_waypoints_total: int
     monitoring_coverage_ratio: float
+    visited_monitoring_waypoints: List[str]
+    final_position_xyz: Tuple[float, float, float]
+    final_distance_to_destination_m: float
     collision_count: int
     has_collided: bool
     min_obstacle_distance_m: float
@@ -203,6 +206,31 @@ class MissionRunner:
                 was_in_collision = False
 
             ctrl_out = controller.compute_control_step(uav_pos, uav_vel, obs_reading)
+            for mon_id in ctrl_out.newly_reached_monitoring_ids:
+                logger.info(
+                    "[Kinematic][Step %d] Reached monitoring waypoint '%s' (%d/%d) at pos=(%.2f, %.2f, %.2f) m",
+                    step,
+                    mon_id,
+                    len(controller.reached_monitoring_ids),
+                    len(global_route.monitoring_waypoints),
+                    uav_pos[0],
+                    uav_pos[1],
+                    uav_pos[2],
+                )
+            if step == 1 or step % 50 == 0 or ctrl_out.mission_completed:
+                logger.info(
+                    "[Kinematic][Step %d] pos=(%.2f, %.2f, %.2f) target_idx=%d/%d (%s) dist=%.2fm mon=%d/%d",
+                    step,
+                    uav_pos[0],
+                    uav_pos[1],
+                    uav_pos[2],
+                    ctrl_out.active_waypoint_index,
+                    len(controller.route_points) - 1,
+                    ctrl_out.active_waypoint_id or "path",
+                    ctrl_out.distance_to_target_m,
+                    len(controller.reached_monitoring_ids),
+                    len(global_route.monitoring_waypoints),
+                )
             if ctrl_out.mission_completed:
                 reached_dest = True
                 termination_reason = (
@@ -282,8 +310,41 @@ class MissionRunner:
 
         try:
             client.connect()
+            client.reset_vehicle()
             client.enable_api_control()
-            client.arm_and_takeoff(altitude_m=global_route.start_position.z)
+
+            # Compute exact route start position in AirSim NED frame before takeoff
+            start_n, start_e, start_d = self.transformer.planner_to_airsim_pos(
+                (
+                    global_route.start_position.x,
+                    global_route.start_position.y,
+                    global_route.start_position.z,
+                )
+            )
+            client.arm_and_takeoff(altitude_m=abs(start_d))
+
+            kin0 = client.get_kinematic_state()
+            dist_to_start_ned = math.hypot(kin0.north - start_n, kin0.east - start_e)
+            if dist_to_start_ned > 0.5 or abs(kin0.down - start_d) > 0.5:
+                logger.info(
+                    "Moving UAV from spawn NED=(%.2f, %.2f, %.2f) to route start NED=(%.2f, %.2f, %.2f) [Planner=(%.1f, %.1f, %.1f)]",
+                    kin0.north,
+                    kin0.east,
+                    kin0.down,
+                    start_n,
+                    start_e,
+                    start_d,
+                    global_route.start_position.x,
+                    global_route.start_position.y,
+                    global_route.start_position.z,
+                )
+                client.move_to_position_ned(
+                    north=start_n,
+                    east=start_e,
+                    down=start_d,
+                    velocity=min(4.0, self.cfg.vehicle_limits.max_velocity_xy_mps),
+                    timeout_sec=max(20.0, self.cfg.airsim.timeout_sec * 2.0),
+                )
 
             kin = client.get_kinematic_state()
             prev_pos = np.asarray(
@@ -302,45 +363,68 @@ class MissionRunner:
                     self.transformer.airsim_to_planner_vel((kin.vn, kin.ve, kin.vd)),
                     dtype=np.float64,
                 )
+                if not np.all(np.isfinite(uav_pos)) or not np.all(np.isfinite(uav_vel)):
+                    termination_reason = "INVALID_STATE_ABORT"
+                    logger.error("[AirSim][Step %d] Non-finite UAV state detected; aborting safely.", step)
+                    client.hover_and_stop()
+                    break
+
                 travelled_dist += float(np.linalg.norm(uav_pos - prev_pos))
                 prev_pos = uav_pos.copy()
                 trajectory.append((float(uav_pos[0]), float(uav_pos[1]), float(uav_pos[2])))
                 velocities.append(uav_vel.copy())
 
                 sim_collided, col_obj = self.sensor_reader.read_collision_info(client)
-                lidar_pts_ned = self.sensor_reader.read_lidar_points_ned(client)
-                if lidar_pts_ned is not None and len(lidar_pts_ned) > 0:
-                    # Convert relative NED points to planner frame
-                    rel_pts_xyz = np.array(
-                        [self.transformer.airsim_to_planner_vel(pt) for pt in lidar_pts_ned],
-                        dtype=np.float64,
+                # Ignore initial ground contact tag ('Ground') if UAV is airborne well above ground
+                if sim_collided and "ground" in col_obj.lower() and uav_pos[2] > 2.0:
+                    sim_collided = False
+                    col_obj = ""
+
+                spheres = [
+                    (float(o.center_xyz[0]), float(o.center_xyz[1]), float(o.center_xyz[2]), float(o.radius))
+                    for o in obstacles
+                ]
+                obs_vels = [
+                    (
+                        float(o.current_velocity[0]),
+                        float(o.current_velocity[1]),
+                        float(o.current_velocity[2]),
                     )
-                    obs_reading = self.sensor_reader.compute_observation_from_points(
+                    for o in obstacles
+                ]
+                sphere_obs = self.sensor_reader.compute_observation_from_spheres(
+                    uav_pos_xyz=uav_pos,
+                    uav_vel_xyz=uav_vel,
+                    obstacles_xyz_r=spheres,
+                    obstacle_vels_xyz=obs_vels,
+                    sensor_mode="GEOMETRIC_SCENARIO_FALLBACK",
+                )
+
+                lidar_pts_ned = self.sensor_reader.read_lidar_points_ned(client)
+                if lidar_pts_ned is not None:
+                    if len(lidar_pts_ned) > 0:
+                        rel_pts_xyz = np.array(
+                            [self.transformer.airsim_to_planner_vel(pt) for pt in lidar_pts_ned],
+                            dtype=np.float64,
+                        )
+                    else:
+                        rel_pts_xyz = np.empty((0, 3), dtype=np.float64)
+                    lidar_obs = self.sensor_reader.compute_observation_from_points(
                         relative_points_xyz=rel_pts_xyz,
                         uav_vel_xyz=uav_vel,
                         has_collided=sim_collided,
                         sensor_mode="LIDAR",
                     )
+                    if sphere_obs.closest_distance_m < lidar_obs.closest_distance_m:
+                        obs_reading = sphere_obs
+                        obs_reading.sensor_mode = "LIDAR+SCENARIO"
+                    else:
+                        obs_reading = lidar_obs
+                    if sim_collided or sphere_obs.has_collided:
+                        obs_reading.has_collided = True
+                        obs_reading.collided_object_name = col_obj or sphere_obs.collided_object_name
                 else:
-                    spheres = [
-                        (float(o.center_xyz[0]), float(o.center_xyz[1]), float(o.center_xyz[2]), float(o.radius))
-                        for o in obstacles
-                    ]
-                    obs_vels = [
-                        (
-                            float(o.current_velocity[0]),
-                            float(o.current_velocity[1]),
-                            float(o.current_velocity[2]),
-                        )
-                        for o in obstacles
-                    ]
-                    obs_reading = self.sensor_reader.compute_observation_from_spheres(
-                        uav_pos_xyz=uav_pos,
-                        uav_vel_xyz=uav_vel,
-                        obstacles_xyz_r=spheres,
-                        obstacle_vels_xyz=obs_vels,
-                        sensor_mode="GEOMETRIC_SCENARIO_FALLBACK",
-                    )
+                    obs_reading = sphere_obs
                     if sim_collided:
                         obs_reading.has_collided = True
                         obs_reading.collided_object_name = col_obj
@@ -351,10 +435,52 @@ class MissionRunner:
                 if obs_reading.has_collided and not was_in_collision:
                     collision_count += 1
                     was_in_collision = True
+                    termination_reason = f"COLLISION_ABORT ({obs_reading.collided_object_name or 'obstacle'})"
+                    logger.error(
+                        "[AirSim][Step %d] Collision detected with '%s' at pos=(%.2f, %.2f, %.2f); stopping safely.",
+                        step,
+                        obs_reading.collided_object_name or "obstacle",
+                        uav_pos[0],
+                        uav_pos[1],
+                        uav_pos[2],
+                    )
+                    client.hover_and_stop()
+                    break
                 elif not obs_reading.has_collided:
                     was_in_collision = False
 
                 ctrl_out = controller.compute_control_step(uav_pos, uav_vel, obs_reading)
+                for mon_id in ctrl_out.newly_reached_monitoring_ids:
+                    logger.info(
+                        "[AirSim][Step %d] Reached monitoring waypoint '%s' (%d/%d) at planner=(%.2f, %.2f, %.2f) NED=(%.2f, %.2f, %.2f)",
+                        step,
+                        mon_id,
+                        len(controller.reached_monitoring_ids),
+                        len(global_route.monitoring_waypoints),
+                        uav_pos[0],
+                        uav_pos[1],
+                        uav_pos[2],
+                        kin.north,
+                        kin.east,
+                        kin.down,
+                    )
+                if step == 1 or step % 20 == 0 or ctrl_out.mission_completed:
+                    logger.info(
+                        "[AirSim][Step %d] planner=(%.2f, %.2f, %.2f) NED=(%.2f, %.2f, %.2f) target_idx=%d/%d (%s) dist=%.2fm mon=%d/%d",
+                        step,
+                        uav_pos[0],
+                        uav_pos[1],
+                        uav_pos[2],
+                        kin.north,
+                        kin.east,
+                        kin.down,
+                        ctrl_out.active_waypoint_index,
+                        len(controller.route_points) - 1,
+                        ctrl_out.active_waypoint_id or "path",
+                        ctrl_out.distance_to_target_m,
+                        len(controller.reached_monitoring_ids),
+                        len(global_route.monitoring_waypoints),
+                    )
                 if ctrl_out.mission_completed:
                     reached_dest = True
                     termination_reason = (
@@ -368,6 +494,10 @@ class MissionRunner:
 
                 for obs in obstacles:
                     obs.step(dt, elapsed_sim_sec)
+
+                if elapsed_sim_sec >= self.cfg.control.max_mission_time_sec:
+                    termination_reason = "MAX_TIME_EXCEEDED"
+                    break
             else:
                 termination_reason = "MAX_STEPS_TIMEOUT"
         except Exception as exc:
@@ -466,6 +596,29 @@ class MissionRunner:
         planning_time = float(global_route.validation.get("planning_time_sec", 0.0))
         planned_length = float(global_route.path_metrics.get("planned_path_length_m", 0.0))
 
+        if trajectory:
+            final_pos = (
+                round(float(trajectory[-1][0]), 4),
+                round(float(trajectory[-1][1]), 4),
+                round(float(trajectory[-1][2]), 4),
+            )
+        else:
+            final_pos = (
+                round(float(global_route.start_position.x), 4),
+                round(float(global_route.start_position.y), 4),
+                round(float(global_route.start_position.z), 4),
+            )
+
+        dest_vec = np.array(
+            [
+                global_route.destination.x,
+                global_route.destination.y,
+                global_route.destination.z,
+            ],
+            dtype=np.float64,
+        )
+        final_dist_to_dest = float(np.linalg.norm(dest_vec - np.asarray(final_pos, dtype=np.float64)))
+
         return MissionResult(
             mission_id=global_route.mission_id,
             nav_mode=nav_mode,
@@ -476,6 +629,9 @@ class MissionRunner:
             monitoring_waypoints_reached=reached_mon,
             monitoring_waypoints_total=total_mon,
             monitoring_coverage_ratio=round(coverage, 4),
+            visited_monitoring_waypoints=list(controller.reached_monitoring_ids),
+            final_position_xyz=final_pos,
+            final_distance_to_destination_m=round(final_dist_to_dest, 4),
             collision_count=collision_count,
             has_collided=bool(collision_count > 0),
             min_obstacle_distance_m=round(float(min_obs_dist), 4),

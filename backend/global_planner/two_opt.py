@@ -45,8 +45,8 @@ class TwoOptOptimizer:
             (optimized_chromosome, final_cost, was_improved)
         """
         n = len(chromosome)
-        if n < 4:
-            # 2-Opt requires at least 4 nodes (or 2 internal waypoints) to perform a non-trivial reversal
+        if n < 2:
+            # 2-Opt requires at least 2 monitoring waypoints (since start and destination are fixed)
             if current_cost is None:
                 current_cost, _, _ = self.calculator.evaluate_chromosome(chromosome)
             return list(chromosome), current_cost, False

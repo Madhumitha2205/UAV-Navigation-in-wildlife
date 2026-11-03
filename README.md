@@ -3,454 +3,186 @@
 This repository contains an integrated UAV navigation framework consisting of two complementary modules:
 
 - **Part 1 – Global Route Planning:** Obstacle-aware surveillance route generation using a hybrid Genetic Algorithm (GA), 2-Opt local search, and A* pathfinding.
-- **Part 2 – Local Navigation and Safety:** TD3-based local movement control, Adaptive Fuzzy Logic (AFL) safety, and AirSim integration.
+- **Part 2 – Local Navigation and Safety:** Baseline waypoint tracking, TD3-based local movement control, Adaptive Fuzzy Logic (AFL) safety override, and 3D AirSim Blocks integration.
 
-The framework is designed to generate global monitoring routes and support downstream local navigation and obstacle-avoidance control in dynamic wildlife-monitoring environments.
-
----
-
-## 1. Architecture Overview
-
-The framework follows a hierarchical navigation approach.
-
-### Part 1: Global Route Planning
-
-1. Environment and configuration loading.
-2. Obstacle-aware A* grid pathfinding.
-3. Pairwise path-distance calculation.
-4. Genetic Algorithm for waypoint ordering.
-5. 2-Opt local route refinement.
-6. Independent route validation.
-7. AirSim Integration JSON export and route visualization.
-
-### Part 2: Local Navigation and Safety
-
-1. Global route loading and coordinate transformation.
-2. TD3-based continuous local movement control.
-3. Adaptive Fuzzy Logic safety override.
-4. Lightweight 3D kinematic simulation and curriculum training.
-5. AirSim multirotor and sensor integration.
-6. Evaluation, logging, and checkpoint management.
+The framework generates validated global monitoring routes, converts them automatically into the controller schema, verifies them in a lightweight 3D kinematic simulator, and executes them visibly on a virtual `SimpleFlight` multirotor in the 3D AirSim Blocks environment.
 
 ---
 
-## 2. Directory Structure
+## 1. Quick Start (Beginner-Friendly End-to-End Workflow)
 
-```text
-UAV-Navigation-in-wildlife/
-│
-├── backend/
-│   ├── __init__.py
-│   │
-│   ├── global_planner/
-│   │   ├── __init__.py
-│   │   ├── config.py
-│   │   ├── environment.py
-│   │   ├── obstacle_manager.py
-│   │   ├── waypoint_generator.py
-│   │   ├── grid_pathfinder.py
-│   │   ├── fitness.py
-│   │   ├── genetic_algorithm.py
-│   │   ├── two_opt.py
-│   │   ├── route_validator.py
-│   │   ├── planner_service.py
-│   │   └── visualization.py
-│   │
-│   └── intelligent_control/
-│       ├── config.py
-│       ├── route_loader.py
-│       ├── coordinate_transform.py
-│       ├── airsim_client.py
-│       ├── airsim_sensors.py
-│       ├── rl_environment.py
-│       ├── actor_network.py
-│       ├── critic_network.py
-│       ├── replay_buffer.py
-│       ├── td3_agent.py
-│       ├── reward_function.py
-│       ├── curriculum.py
-│       ├── fuzzy_safety.py
-│       ├── motion_controller.py
-│       ├── mission_runner.py
-│       ├── evaluation.py
-│       └── logging_utils.py
-│
-├── configs/
-│   ├── default_environment.json
-│   ├── controller_config.json
-│   ├── safety_config.json
-│   └── sample_global_route.json
-│
-├── models/
-├── logs/
-├── outputs/
-│
-├── tests/
-│   ├── test_environment.py
-│   ├── test_obstacles.py
-│   ├── test_grid_pathfinder.py
-│   ├── test_two_opt.py
-│   ├── test_route_validator.py
-│   └── test_planner.py
-│
-├── main.py
-├── td3_main.py
-├── requirements.txt
-├── pytest.ini
-├── INTEGRATION_GUIDE.md
-└── README.md
+Run all commands from **PowerShell** in the project root (`C:\Users\madhu\OneDrive\Desktop\UAV-Navigation-in-wildlife`).
+
+### Step 1: Generate, Validate, and Verify the Global Route in Kinematic Simulation
+
+```powershell
+.\.venv\Scripts\python.exe run_pipeline.py
+```
+
+Or run the individual stages directly:
+
+```powershell
+# 1a. Generate and validate global route (exports outputs/planned_route.json and outputs/controller_route.json)
+.\.venv\Scripts\python.exe main.py --config configs/default_environment.json --output-dir outputs
+
+# 1b. Run kinematic baseline controller on the validated route (no TD3 checkpoint or AirSim required)
+.\.venv\Scripts\python.exe td3_main.py --mode baseline
+```
+
+### Step 2: Start the 3D AirSim Blocks Simulator
+
+Open the AirSim Blocks 3D window before running any AirSim flight command:
+
+```powershell
+Start-Process "D:\AirSimEnvironments\Blocks\Blocks\WindowsNoEditor\Blocks\Binaries\Win64\Blocks.exe" -ArgumentList "-ResX=1280","-ResY=720","-windowed"
+```
+
+Verify that AirSim is listening on `127.0.0.1:41451` and that `SimpleFlight` and `LidarSensor1` are ready:
+
+```powershell
+.\.venv\Scripts\python.exe scripts/verify_airsim_connection.py
+```
+
+### Step 3: Spawn 3D Wildlife Obstacles & Fly the Virtual UAV in AirSim 3D Blocks
+
+You can optionally spawn visible 3D scene representations of the global planner's obstacle regions (`dense_canopy_01`, `mountain_ridge_01`, `elephant_herd_snapshot`) inside AirSim Blocks before flying:
+
+```powershell
+# 3a. Spawn the complete 24-actor 3D obstacle layout in AirSim Blocks
+.\.venv\Scripts\python.exe scripts/manage_airsim_obstacles.py --action spawn
+
+# 3b. Run the AirSim 3D baseline route-following flight (with --spawn-obstacles to ensure layout is active)
+.\.venv\Scripts\python.exe td3_main.py --mode airsim-baseline --spawn-obstacles
+
+# 3c. Or run the full end-to-end pipeline with 3D obstacle spawning enabled
+.\.venv\Scripts\python.exe run_pipeline.py --airsim --spawn-obstacles
+
+# 3d. Clean up ONLY project-created (wl_obs_*) 3D obstacles while preserving all pre-existing Blocks actors
+.\.venv\Scripts\python.exe scripts/manage_airsim_obstacles.py --action cleanup
+
+# 3e. Run full 4-phase obstacle verification (single-obstacle test, RGB camera + LiDAR distance check, controlled collision check, and full layout spawn)
+.\.venv\Scripts\python.exe scripts/manage_airsim_obstacles.py --action verify-all
+```
+
+### Step 4: Train and Evaluate TD3 + Adaptive Fuzzy Safety
+
+Modes that use the TD3 neural policy (`--mode dry-run`, `--mode evaluate`, `--mode airsim`, or `run_pipeline.py --controller td3`) require a trained checkpoint at `models/td3_wildlife_uav.pt`.
+
+```powershell
+# 4a. Train the TD3 checkpoint in the 3-stage curriculum environment
+.\.venv\Scripts\python.exe td3_main.py --mode train --episodes 150
+
+# 4b. Run TD3 + Adaptive Fuzzy Safety in kinematic dry-run simulation
+.\.venv\Scripts\python.exe td3_main.py --mode dry-run
+
+# 4c. Run comparative evaluation (Config A: Baseline, Config B: TD3 only, Config C: TD3 + Fuzzy Safety)
+.\.venv\Scripts\python.exe td3_main.py --mode evaluate --seeds 101 102 103
+
+# 4d. Fly TD3 + Adaptive Fuzzy Safety in 3D AirSim Blocks (requires Blocks.exe running)
+.\.venv\Scripts\python.exe td3_main.py --mode airsim
 ```
 
 ---
 
-## 3. Part 1 – Global Route Planning
+## 2. Architecture Overview
 
-### 3.1 Obstacle-Aware A* Grid Search
+### Part 1: Global Route Planning (`backend/global_planner/`)
 
-The environment is discretized into an occupancy grid using the configured grid resolution.
+1. Environment and configuration loading (`configs/default_environment.json`).
+2. Obstacle-aware 8-connected A* grid pathfinding (`grid_pathfinder.py`) with continuous grid-step preservation (`max_segment_length = grid_res * 1.5`).
+3. Pairwise path-distance calculation and segment caching (`fitness.py`).
+4. Genetic Algorithm for waypoint ordering (`genetic_algorithm.py`).
+5. 2-Opt local route refinement (`two_opt.py`).
+6. Independent route validation (`route_validator.py`) verifying start/destination endpoints, sequential waypoint coverage on the actual path geometry, step continuity, path length consistency, and obstacle clearance.
+7. Authoritative planner output export (`outputs/planned_route.json`), automatic controller schema conversion (`outputs/controller_route.json`), and route visualization (`outputs/planned_route_map.png`).
 
-- Circular and rectangular obstacles are represented geometrically.
-- Obstacles are inflated using the safety-clearance distance.
-- A* searches using eight possible movement directions.
-- Orthogonal movement has a cost of 1.0.
-- Diagonal movement has a cost of √2.
-- Diagonal corner-cutting is prevented by checking adjacent orthogonal cells.
-- Pairwise paths between the start, destination, and monitoring waypoints are cached for repeated route evaluation.
+### Part 2: Local Navigation, Safety & AirSim Integration (`backend/intelligent_control/`)
 
-### 3.2 Genetic Algorithm
-
-The Genetic Algorithm solves the waypoint-ordering problem.
-
-- Each chromosome represents a permutation of waypoint IDs.
-- Start and destination remain fixed.
-- 50% of the initial population uses Snake-Grid heuristic seeding.
-- The remaining population is randomized to maintain diversity.
-- Order Crossover (OX) generates valid waypoint permutations.
-- Swap and inversion mutations introduce variation.
-- Elitism preserves the best candidates between generations.
-
-### 3.3 2-Opt Local Search
-
-2-Opt improves candidate routes by reversing intermediate waypoint sequences.
-
-- Applied every 10 generations.
-- Applied to the top 20% of the population.
-- Uses obstacle-aware distances when evaluating changes.
-- Rejects changes that introduce collisions or unreachable segments.
-
-### 3.4 Route Validation
-
-An independent route validator checks:
-
-- Start and destination endpoints.
-- Monitoring waypoint coverage.
-- Obstacle clearance.
-- Environment boundaries.
-- Path feasibility.
-
-### 3.5 Cost Function
-
-The objective minimizes obstacle-aware flight distance while penalizing missing or infeasible segments.
-
-\[
-\text{Total Cost} =
-\text{Path Length}
-+ P_{\text{missing}}N_{\text{missing}}
-+ P_{\text{infeasible}}N_{\text{infeasible}}
-\]
-
-The incoming Global Planner configuration documents:
-
-- \(P_{\text{missing}} = 100{,}000\)
-- \(P_{\text{infeasible}} = 500{,}000\)
-
-Fitness is calculated as:
-
-\[
-\text{Fitness} = \frac{1}{1+\text{Total Cost}}
-\]
-
-The Genetic Algorithm is a metaheuristic and does not guarantee the mathematical global optimum.
+1. Validated route loading and schema verification (`route_loader.py`).
+2. Bi-directional coordinate transformation (`coordinate_transform.py`) between Planner ENU/Altitude-Up and AirSim NED.
+3. Proportional baseline waypoint tracker (`BASELINE`) and TD3 continuous velocity control (`TD3_NO_SAFETY`, `TD3_WITH_FUZZY_SAFETY`) in `motion_controller.py`.
+4. 9-rule Mamdani Adaptive Fuzzy Logic safety layer (`fuzzy_safety.py`).
+5. 3D kinematic simulation and curriculum training (`rl_environment.py`, `curriculum.py`).
+6. Live AirSim multirotor flight lifecycle and LiDAR/collision telemetry (`airsim_client.py`, `airsim_sensors.py`, `mission_runner.py`).
 
 ---
 
-## 4. Part 2 – TD3 Local Navigation Control
+## 3. Route Files and Coordinate Frames
 
-The local navigation module uses Twin Delayed Deep Deterministic Policy Gradient (TD3) to generate continuous UAV movement actions.
+### 3.1 Authoritative Route Files
 
-### 4.1 TD3 Components
+- **`outputs/planned_route.json` (Authoritative Global Planner Output):** Exported by `GlobalPlannerService.export_route()`. Contains `schema_version`, `planner`, `status`, `start`, `destination`, `ordered_monitoring_waypoints`, continuous `path_points` (`271` points for the default wildlife reserve, max step `1.414 m`), `metrics`, and `validation`.
+- **`outputs/controller_route.json` (Validated Controller Input):** Automatically generated from the validated `PlannedRoute` and active `Environment` obstacles by `GlobalPlannerService.export_controller_route()` (and `route_loader.convert_planned_route_file()`). Contains `start_position`, `destination`, `monitoring_waypoints`, `intermediate_path_points`, `static_obstacles`, `path_metrics`, `validation`, and `coordinate_convention`.
 
-The implementation includes:
+### 3.2 Coordinate Frame Conventions
 
-- Actor network.
-- Twin Critic networks.
-- Target Actor and Target Critic networks.
-- Experience Replay Buffer.
-- Target Policy Smoothing.
-- Delayed Policy Updates.
+| Interface / Module | Coordinate Frame | Axes Convention |
+|---|---|---|
+| Global Planner (`backend/global_planner/`) | `planner_xy_altitude_up` (`ENU_ALT_UP`) | `X` = East (m), `Y` = North (m), `Z` = Altitude positive **UP** (m) |
+| Controller & Plots (`backend/intelligent_control/`) | `ENU_ALT_UP` | `X` = East (m), `Y` = North (m), `Z` = Altitude positive **UP** (m) |
+| AirSim Simulator (`AirSimUAVClient`) | `NED` | `North` = `+Y_planner`, `East` = `+X_planner`, `Down` = `-Z_planner + origin_ned[2]` |
 
-The action represents continuous three-dimensional velocity:
+- **AirSim Blocks Vertical Reference Datum (`origin_ned`):** In the Unreal `Blocks` environment (`Blocks.exe`), pre-baked static mesh block towers (`TemplateCube_Rounded_*`) in the central courtyard extend up to `z_ned = -23.98 m` (`24 m` above the courtyard floor). In `configs/controller_config.json`, `origin_ned` is set to `[0.0, 0.0, -18.0]` so the planner's `Z = 0 m` reference ground plane maps to `Down = -18.0 m` and the nominal `Z = 10.0 m` flight altitude maps to `Down = -28.0 m` (`4.02 m` clear above the tallest static block towers while remaining directly in view above the Blocks courtyard).
 
-\[
-A = [v_x, v_y, v_z]
-\]
+---
 
-### 4.2 State Representation
+## 4. Expected Output Files
 
-The local controller uses a 12-dimensional state vector.
-
-| Indices | Information |
+| File Path | Description |
 |---|---|
-| 0–2 | Normalized relative target position |
-| 3–5 | Normalized UAV velocity |
-| 6 | Normalized target distance |
-| 7–9 | Unit obstacle-repulsion vector |
-| 10 | Normalized obstacle surface distance |
-| 11 | Normalized hazard indicator |
+| `outputs/planned_route.json` | Authoritative global planner route JSON (`271` continuous path points, `6/6` waypoints, `294.85 m`). |
+| `outputs/controller_route.json` | Automatically converted controller route JSON with environment obstacles and validation status. |
+| `outputs/planned_route_map.png` | 2D visualization of the planned wildlife monitoring route, waypoints, and obstacles. |
+| `outputs/ga_convergence.png` | Genetic Algorithm + 2-Opt fitness convergence plot across generations. |
+| `outputs/baseline_kinematic_result.json` | Mission summary JSON for the kinematic `BASELINE` run. |
+| `outputs/baseline_kinematic_trajectory.csv` | Recorded step-by-step `(x, y, z)` trajectory for the kinematic `BASELINE` run. |
+| `outputs/baseline_kinematic_trajectory.png` | 2D trajectory plot comparing planned route vs. flown kinematic baseline trajectory. |
+| `outputs/airsim_baseline_result.json` | Mission summary JSON for the live 3D AirSim Blocks `BASELINE` flight. |
+| `outputs/airsim_baseline_trajectory.csv` | Recorded step-by-step `(x, y, z)` trajectory from live 3D AirSim flight. |
+| `outputs/airsim_baseline_trajectory.png` | 2D trajectory plot of the actual 3D AirSim Blocks flight path. |
+| `models/td3_wildlife_uav.pt` | Trained TD3 actor/critic PyTorch checkpoint (created by `--mode train`). |
+| `models/td3_wildlife_uav.meta.json` | Metadata sidecar for the trained TD3 checkpoint. |
+| `outputs/td3_dry_run_result.json` | Mission summary JSON for `TD3_WITH_FUZZY_SAFETY` kinematic dry-run. |
+| `outputs/td3_dry_run_trajectory.png` | Trajectory plot for `TD3_WITH_FUZZY_SAFETY` kinematic dry-run. |
+| `outputs/comparative_trajectory_plot.png` | Comparative trajectory plot across Baseline, TD3-only, and TD3 + Fuzzy Safety. |
+| `outputs/comparative_metrics_bar_chart.png` | Comparative metrics bar chart across evaluated configurations. |
+| `logs/controller_execution.log` | Detailed timestamped mission execution log including waypoint-reached events. |
 
-The state representation combines target-navigation information, UAV movement, and obstacle information.
+---
 
-### 4.3 Training Environment
+## 5. Running Automated Tests
 
-The framework includes a lightweight 3D kinematic environment and a five-stage curriculum-training process.
+Run the full unit and integration test suite using the repository's `.venv`:
 
-This supports offline training and evaluation without requiring Unreal Engine.
+```powershell
+.\.venv\Scripts\python.exe -m pytest -v -rs
+```
 
-### 4.4 Checkpoint Management
+Check package dependency health:
 
-The TD3 module supports saving and loading model checkpoints, including network and optimizer states, training progress, and configuration metadata.
-
-The documented checkpoint location is:
-
-```text
-models/td3_wildlife_uav.pt
+```powershell
+.\.venv\Scripts\python.exe -m pip check
 ```
 
 ---
 
-## 5. Adaptive Fuzzy Logic Safety
+## 6. Troubleshooting
 
-The Adaptive Fuzzy Logic (AFL) module provides a safety override for local movement commands.
-
-It considers:
-
-- Distance to nearby obstacles.
-- Obstacle closing speed.
-- Obstacle-repulsion direction.
-- Lateral tangent steering.
-
-The documented safety thresholds are:
-
-- Safe distance: 6 metres.
-- Critical distance: 2.5 metres.
-
-The fuzzy inference system uses nine rules based on three distance categories (CRITICAL, NEAR, SAFE) and three closing-speed categories (SLOW, MODERATE, FAST).
-
-The controller combines geometric repulsion and lateral tangent steering to modify movement commands when obstacle conditions require it.
-
-**Note:** This heuristic safety mechanism is not a formal mathematical proof of collision avoidance.
+1. **AirSim Connection Refused (`127.0.0.1:41451`):**
+   - Ensure `Blocks.exe` is running (`Start-Process "D:\AirSimEnvironments\Blocks\Blocks\WindowsNoEditor\Blocks\Binaries\Win64\Blocks.exe" -ArgumentList "-ResX=1280","-ResY=720","-windowed"`).
+   - Run `.\.venv\Scripts\python.exe scripts/verify_airsim_connection.py` to verify RPC connectivity, `SimpleFlight` vehicle discovery, and `LidarSensor1` point cloud streaming.
+2. **Missing TD3 Checkpoint (`models/td3_wildlife_uav.pt`):**
+   - Modes `--mode dry-run`, `--mode evaluate`, and `--mode airsim` refuse to execute with random untrained weights.
+   - Run `.\.venv\Scripts\python.exe td3_main.py --mode train --episodes 150` to train and save `models/td3_wildlife_uav.pt`, or use `--mode baseline` / `--mode airsim-baseline` for deterministic baseline waypoint tracking.
+3. **Invalid or Stale Route File (`RouteValidationError`):**
+   - Regenerate both `outputs/planned_route.json` and `outputs/controller_route.json` by running `.\.venv\Scripts\python.exe main.py --config configs/default_environment.json --output-dir outputs`.
 
 ---
 
-## 6. AirSim Integration
-
-The framework supports integration between the global planner and the local navigation controller.
-
-### 6.1 Global Route Export
-
-The Global Planner exports a validated JSON flight plan containing:
-
-- Schema version.
-- Planner identifier.
-- Start and destination coordinates.
-- Ordered monitoring waypoints.
-- Path points.
-- Route metrics.
-- Validation status.
-
-The output location is:
-
-```text
-outputs/route.json
-```
-
-### 6.2 Coordinate Transformation
-
-The Global Planner and the AirSim controller use coordinate conventions that must be reconciled during integration.
-
-The Part 2 coordinate transformation module handles conversion between the planner's ENU altitude-positive-up representation and AirSim's NED representation.
-
-The exact axis mapping must remain consistent with the implementation and configuration in:
-
-```text
-backend/intelligent_control/coordinate_transform.py
-```
-
-### 6.3 AirSim Client and Sensors
-
-The AirSim integration includes:
-
-- Multirotor client communication.
-- Safe takeoff and landing lifecycle.
-- LiDAR sensor integration.
-- Sensor-data processing.
-- Geometric obstacle fallback.
-
-AirSim can be used when a compatible simulator is available.
-
-The project does not automatically spawn wildlife models in AirSim scenes; scripted objects or geometric obstacle representations can be used.
-
----
-
-## 7. Installation and Setup
-
-### 7.1 Prerequisites
-
-The Part 2 implementation documents the following tested environment:
-
-- Windows 10/11.
-- Python 3.11.9.
-- CPU-based PyTorch.
-- AirSim Python client 1.8.1 for simulator integration.
-
-The incoming Part 1 documentation also describes Ubuntu Linux with Python 3.8.10. The complete integrated project should be tested in the actual environment used by the team.
-
-### 7.2 Create a Virtual Environment
-
-On Windows PowerShell:
-
-```powershell
-python -m venv .venv
-```
-
-Activate it:
-
-```powershell
-.\.venv\Scripts\Activate.ps1
-```
-
-Upgrade pip:
-
-```powershell
-python -m pip install --upgrade pip
-```
-
-Install dependencies:
-
-```powershell
-python -m pip install -r requirements.txt
-```
-
-For AirSim installations, the Part 2 setup documentation describes installing the required packages before installing AirSim without build isolation:
-
-```powershell
-python -m pip install msgpack-rpc-python
-python -m pip install --no-build-isolation --no-deps airsim
-```
-
----
-
-## 8. Running the Global Planner
-
-The Global Planner is executed through `main.py`.
-
-### Default Scenario
-
-```powershell
-python main.py
-```
-
-### Custom Configuration and Output Directory
-
-```powershell
-python main.py --config configs/default_environment.json --output-dir outputs/
-```
-
-### Run Without Plots
-
-```powershell
-python main.py --no-plots
-```
-
----
-
-## 9. Running the TD3 Local Controller
-
-The TD3 implementation is preserved in `td3_main.py`.
-
-### Training
-
-```powershell
-python td3_main.py --mode train --episodes 120
-```
-
-### Dry Run
-
-```powershell
-python td3_main.py --mode dry-run --route configs/sample_global_route.json
-```
-
-### Evaluation
-
-```powershell
-python td3_main.py --mode evaluate --seeds 101 102 103 104 105
-```
-
-### AirSim Mode
-
-```powershell
-python td3_main.py --mode airsim
-```
-
-AirSim mode requires a compatible simulator instance and the appropriate settings and sensor configuration.
-
----
-
-## 10. Running Tests
-
-Run the project tests from the repository root:
-
-```powershell
-python -m pytest -v -rs
-```
-
-The incoming Global Planner documentation reports 28 deterministic tests covering:
-
-- Environment validation and boundary constraints.
-- Circular and rectangular obstacle collisions.
-- Safety-clearance enforcement.
-- A* obstacle detours and unreachable targets.
-- Diagonal corner-cutting prevention.
-- Genetic Algorithm permutation validity.
-- Fixed start and destination endpoints.
-- 2-Opt route refinement.
-- Independent route validation.
-- Same-seed reproducibility.
-- AirSim JSON contract conformance.
-
-The complete integrated project should be tested after merging both modules.
-
----
-
-## 11. Limitations
-
-The framework has the following documented limitations:
-
-1. The project demonstrates software simulation and does not claim real-world UAV flight validation.
-2. The lightweight kinematic environment does not represent every aspect of a full six-degree-of-freedom flight model.
-3. The fuzzy safety controller is a heuristic mechanism, not a formal collision-avoidance guarantee.
-4. Energy consumption is estimated using a proxy and does not represent measured physical battery discharge.
-5. Simulated obstacle geometry does not provide camera-based wildlife perception.
-6. The Genetic Algorithm does not guarantee a mathematically optimal global route.
-
----
-
-## 12. Research Scope
-
-The project combines global route optimization and local navigation control for wildlife-monitoring scenarios.
-
-The Global Planner generates obstacle-aware routes through designated monitoring points. The local navigation module uses TD3 to generate continuous movement actions, while Adaptive Fuzzy Logic provides an additional safety override.
-
-The AirSim integration provides a pathway for connecting the generated global route to local UAV control and simulation.
-
-The project should be evaluated according to its implemented simulation capabilities and documented limitations.
+## 7. Known Limitations
+
+1. **Simulation Only:** This project operates strictly in virtual simulation (kinematic and AirSim 3D Blocks) and must never be connected to a physical UAV.
+2. **Kinematic Training Environment:** TD3 training uses a lightweight 3D kinematic point-mass approximation with first-order velocity response rather than full aerodynamic rotor physics.
+3. **Heuristic Safety Layer:** The Adaptive Fuzzy Logic (AFL) safety layer is a heuristic reactive filter and not a formal control-barrier mathematical proof.
+4. **Energy Proxy:** Reported energy values (`estimated_energy_proxy_joules`) are kinematic control-effort integrals, not physical battery discharge measurements.
+5. **Static Mesh Obstacles in AirSim Blocks:** The Unreal `Blocks` map has pre-baked static mesh blocks rather than dynamic 3D animal meshes; scenario obstacles are combined with live `LidarSensor1` point clouds during flight.
