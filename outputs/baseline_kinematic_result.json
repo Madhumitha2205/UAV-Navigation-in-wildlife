@@ -1,0 +1,44 @@
+{
+  "mission_id": "wildlife_monitoring_generated_route",
+  "nav_mode": "BASELINE",
+  "execution_backend": "kinematic_dry_run",
+  "success": true,
+  "termination_reason": "SUCCESS_COMPLETED",
+  "reached_final_destination": true,
+  "monitoring_waypoints_reached": 6,
+  "monitoring_waypoints_total": 6,
+  "monitoring_coverage_ratio": 1.0,
+  "visited_monitoring_waypoints": [
+    "waterhole_alpha",
+    "grazing_plain_bravo",
+    "river_crossing_charlie",
+    "canopy_edge_delta",
+    "salt_lick_echo",
+    "nesting_cliff_foxtrot"
+  ],
+  "final_position_xyz": [
+    93.1354,
+    94.2955,
+    10.0
+  ],
+  "final_distance_to_destination_m": 1.9933,
+  "collision_count": 0,
+  "has_collided": false,
+  "min_obstacle_distance_m": 2.4512,
+  "total_travelled_distance_m": 281.7961,
+  "planned_route_length_m": 294.8528,
+  "steps_executed": 692,
+  "planning_time_sec": 0.3379,
+  "execution_time_sec": 0.1169,
+  "simulated_flight_duration_sec": 69.1,
+  "fuzzy_intervention_count": 0,
+  "fuzzy_intervention_rate": 0.0,
+  "control_smoothness_rms_jerk_mps2": 2.5631,
+  "estimated_energy_proxy_joules": 16298.3,
+  "energy_proxy_model_note": "Estimated kinematic control-effort proxy (NOT physical battery measurement): integral of (P_hover + k_v * ||v||^2 + k_a * ||dv/dt||^2) dt",
+  "artifacts": {
+    "summary_json": "outputs\\baseline_kinematic_result.json",
+    "trajectory_csv": "outputs\\baseline_kinematic_trajectory.csv",
+    "trajectory_plot": "outputs\\baseline_kinematic_trajectory.png"
+  }
+}

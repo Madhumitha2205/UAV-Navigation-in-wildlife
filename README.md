@@ -64,6 +64,21 @@ You can optionally spawn visible 3D scene representations of the global planner'
 .\.venv\Scripts\python.exe scripts/manage_airsim_obstacles.py --action verify-all
 ```
 
+### Optional: Fly a planned route from the web dashboard
+
+The dashboard's live mode sends planner and flight-control requests to the unified backend on port `8001`. Start AirSim Blocks first and merge `configs/airsim_settings.json` into AirSim's user settings file if the `SimpleFlight` vehicle or LiDAR sensor is not configured.
+
+```powershell
+# Terminal 1, from the project root
+.\.venv\Scripts\python.exe -m backend.server
+
+# Terminal 2, from the project root
+Set-Location frontend
+npm run dev
+```
+
+In the dashboard, switch to **Live Backend Connection**, open **Live Monitoring**, click **Plan Route**, then **Connect AirSim** and **Start Mission**. A live mission is disabled until both a route and AirSim connection are available; the multirotor flies in the AirSim Blocks window while the dashboard displays its telemetry.
+
 ### Step 4: Train and Evaluate TD3 + Adaptive Fuzzy Safety
 
 Modes that use the TD3 neural policy (`--mode dry-run`, `--mode evaluate`, `--mode airsim`, or `run_pipeline.py --controller td3`) require a trained checkpoint at `models/td3_wildlife_uav.pt`.

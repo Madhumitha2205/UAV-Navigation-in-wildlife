@@ -1,8 +1,8 @@
 import axios from 'axios'
 
 // Configurable environment URLs with fallback
-export const GLOBAL_API_URL = import.meta.env.VITE_GLOBAL_API_URL || 'http://localhost:8000'
 export const CONTROL_API_URL = import.meta.env.VITE_CONTROL_API_URL || 'http://localhost:8001'
+export const GLOBAL_API_URL = import.meta.env.VITE_GLOBAL_API_URL || CONTROL_API_URL
 export const DEFAULT_WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8001/ws/telemetry'
 
 export const globalPlannerClient = axios.create({

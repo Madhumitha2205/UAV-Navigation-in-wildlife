@@ -1,0 +1,777 @@
+{
+  "schema_version": "1.0",
+  "planner": "GA_2OPT_ASTAR",
+  "status": "success",
+  "coordinate_frame": "planner_xy_altitude_up",
+  "start": {
+    "x": 12.0,
+    "y": 12.0,
+    "altitude": 10.0
+  },
+  "destination": {
+    "x": 86.3678,
+    "y": 88.0,
+    "altitude": 10.0
+  },
+  "ordered_monitoring_waypoints": [
+    {
+      "order": 1,
+      "id": "WP_1",
+      "x": 22.27,
+      "y": 24.06,
+      "altitude": 10.0,
+      "importance_weight": 1.0,
+      "is_mandatory": true
+    },
+    {
+      "order": 2,
+      "id": "WP_2",
+      "x": 34.53,
+      "y": 33.49,
+      "altitude": 10.0,
+      "importance_weight": 2.0,
+      "is_mandatory": true
+    },
+    {
+      "order": 3,
+      "id": "WP_3",
+      "x": 58.09,
+      "y": 51.31,
+      "altitude": 10.0,
+      "importance_weight": 1.0,
+      "is_mandatory": true
+    },
+    {
+      "order": 4,
+      "id": "WP_4",
+      "x": 72.23,
+      "y": 69.13,
+      "altitude": 10.0,
+      "importance_weight": 1.0,
+      "is_mandatory": true
+    }
+  ],
+  "path_points": [
+    {
+      "point_index": 0,
+      "x": 12.0,
+      "y": 12.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": "START"
+    },
+    {
+      "point_index": 1,
+      "x": 13.0,
+      "y": 13.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 2,
+      "x": 14.0,
+      "y": 14.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 3,
+      "x": 15.0,
+      "y": 15.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 4,
+      "x": 16.0,
+      "y": 16.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 5,
+      "x": 17.0,
+      "y": 17.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 6,
+      "x": 18.0,
+      "y": 18.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 7,
+      "x": 19.0,
+      "y": 19.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 8,
+      "x": 20.0,
+      "y": 20.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 9,
+      "x": 21.0,
+      "y": 21.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 10,
+      "x": 21.0,
+      "y": 22.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 11,
+      "x": 22.0,
+      "y": 23.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 12,
+      "x": 22.27,
+      "y": 24.06,
+      "altitude": 10.0,
+      "is_monitoring": true,
+      "waypoint_id": "WP_1"
+    },
+    {
+      "point_index": 13,
+      "x": 23.0,
+      "y": 25.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 14,
+      "x": 24.0,
+      "y": 26.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 15,
+      "x": 25.0,
+      "y": 27.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 16,
+      "x": 26.0,
+      "y": 28.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 17,
+      "x": 27.0,
+      "y": 29.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 18,
+      "x": 28.0,
+      "y": 30.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 19,
+      "x": 29.0,
+      "y": 30.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 20,
+      "x": 30.0,
+      "y": 31.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 21,
+      "x": 31.0,
+      "y": 31.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 22,
+      "x": 32.0,
+      "y": 32.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 23,
+      "x": 33.0,
+      "y": 32.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 24,
+      "x": 34.0,
+      "y": 33.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 25,
+      "x": 34.53,
+      "y": 33.49,
+      "altitude": 10.0,
+      "is_monitoring": true,
+      "waypoint_id": "WP_2"
+    },
+    {
+      "point_index": 26,
+      "x": 36.0,
+      "y": 34.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 27,
+      "x": 37.0,
+      "y": 35.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 28,
+      "x": 38.0,
+      "y": 36.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 29,
+      "x": 39.0,
+      "y": 37.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 30,
+      "x": 40.0,
+      "y": 38.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 31,
+      "x": 41.0,
+      "y": 39.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 32,
+      "x": 42.0,
+      "y": 40.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 33,
+      "x": 43.0,
+      "y": 41.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 34,
+      "x": 44.0,
+      "y": 42.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 35,
+      "x": 45.0,
+      "y": 43.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 36,
+      "x": 46.0,
+      "y": 44.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 37,
+      "x": 47.0,
+      "y": 45.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 38,
+      "x": 48.0,
+      "y": 46.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 39,
+      "x": 49.0,
+      "y": 47.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 40,
+      "x": 50.0,
+      "y": 47.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 41,
+      "x": 51.0,
+      "y": 48.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 42,
+      "x": 52.0,
+      "y": 48.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 43,
+      "x": 53.0,
+      "y": 49.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 44,
+      "x": 54.0,
+      "y": 49.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 45,
+      "x": 55.0,
+      "y": 50.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 46,
+      "x": 56.0,
+      "y": 50.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 47,
+      "x": 57.0,
+      "y": 51.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 48,
+      "x": 58.09,
+      "y": 51.31,
+      "altitude": 10.0,
+      "is_monitoring": true,
+      "waypoint_id": "WP_3"
+    },
+    {
+      "point_index": 49,
+      "x": 59.0,
+      "y": 52.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 50,
+      "x": 60.0,
+      "y": 53.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 51,
+      "x": 61.0,
+      "y": 54.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 52,
+      "x": 62.0,
+      "y": 55.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 53,
+      "x": 63.0,
+      "y": 56.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 54,
+      "x": 64.0,
+      "y": 57.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 55,
+      "x": 65.0,
+      "y": 58.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 56,
+      "x": 66.0,
+      "y": 59.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 57,
+      "x": 67.0,
+      "y": 60.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 58,
+      "x": 68.0,
+      "y": 61.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 59,
+      "x": 69.0,
+      "y": 62.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 60,
+      "x": 69.0,
+      "y": 63.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 61,
+      "x": 70.0,
+      "y": 64.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 62,
+      "x": 70.0,
+      "y": 65.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 63,
+      "x": 71.0,
+      "y": 66.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 64,
+      "x": 71.0,
+      "y": 67.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 65,
+      "x": 72.0,
+      "y": 68.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 66,
+      "x": 72.23,
+      "y": 69.13,
+      "altitude": 10.0,
+      "is_monitoring": true,
+      "waypoint_id": "WP_4"
+    },
+    {
+      "point_index": 67,
+      "x": 73.0,
+      "y": 70.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 68,
+      "x": 74.0,
+      "y": 71.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 69,
+      "x": 75.0,
+      "y": 72.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 70,
+      "x": 76.0,
+      "y": 73.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 71,
+      "x": 77.0,
+      "y": 74.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 72,
+      "x": 78.0,
+      "y": 75.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 73,
+      "x": 79.0,
+      "y": 76.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 74,
+      "x": 80.0,
+      "y": 77.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 75,
+      "x": 81.0,
+      "y": 78.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 76,
+      "x": 82.0,
+      "y": 79.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 77,
+      "x": 82.0,
+      "y": 80.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 78,
+      "x": 83.0,
+      "y": 81.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 79,
+      "x": 83.0,
+      "y": 82.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 80,
+      "x": 84.0,
+      "y": 83.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 81,
+      "x": 84.0,
+      "y": 84.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 82,
+      "x": 85.0,
+      "y": 85.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 83,
+      "x": 85.0,
+      "y": 86.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 84,
+      "x": 86.0,
+      "y": 87.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": null
+    },
+    {
+      "point_index": 85,
+      "x": 86.3678,
+      "y": 88.0,
+      "altitude": 10.0,
+      "is_monitoring": false,
+      "waypoint_id": "DEST"
+    }
+  ],
+  "metrics": {
+    "path_length": 111.4845,
+    "coverage_percentage": 100.0,
+    "visited_waypoints": 4,
+    "required_waypoints": 4,
+    "collision_count": 0,
+    "minimum_obstacle_clearance": 2.8539,
+    "planning_time_seconds": 0.2931,
+    "generations_completed": 50,
+    "two_opt_improvements": 0
+  },
+  "validation": {
+    "is_valid": true,
+    "errors": [],
+    "warnings": [],
+    "details": {
+      "waypoint_path_indices": [
+        12,
+        25,
+        48,
+        66
+      ],
+      "minimum_obstacle_clearance": 2.8539366637896295,
+      "collision_count": 0,
+      "discontinuity_count": 0,
+      "max_segment_step_m": 1.555956297586791,
+      "calculated_path_length": 111.48451481285777,
+      "reported_path_length": 111.4845148128579,
+      "visited_waypoints_count": 4,
+      "required_waypoints_count": 4,
+      "coverage_percentage": 100.0
+    }
+  }
+}

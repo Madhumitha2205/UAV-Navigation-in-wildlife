@@ -14,8 +14,8 @@ export const controlApi = {
   async getSimulationStatus(isDemoMode: boolean = true): Promise<SimulationStatusResponse> {
     if (isDemoMode) {
       return {
-        simulator_connected: true,
-        simulator_version: 'AirSim-v1.8.1-UE4-Simulated',
+        simulator_connected: false,
+        simulator_version: 'Kinematic-Hybrid-Engine',
         uav_armed: true,
         api_control_enabled: true,
         active_mission_id: 'wildlife_monitoring_corridor_01',
@@ -43,11 +43,18 @@ export const controlApi = {
     return response.data
   },
 
-  async startMission(missionId: string, isDemoMode: boolean = true) {
+  async startMission(
+    missionId: string,
+    isDemoMode: boolean = true,
+    executionBackend: 'airsim' | 'kinematic' | 'auto' = 'airsim',
+  ) {
     if (isDemoMode) {
       return { success: true, mission_id: missionId, message: 'Demo mission started' }
     }
-    const response = await controlClient.post('/api/mission/start', { mission_id: missionId })
+    const response = await controlClient.post('/api/mission/start', {
+      mission_id: missionId,
+      execution_backend: executionBackend,
+    })
     return response.data
   },
 
@@ -72,6 +79,14 @@ export const controlApi = {
       return { success: true, message: 'Demo mission aborted safely' }
     }
     const response = await controlClient.post('/api/mission/stop')
+    return response.data
+  },
+
+  async restartMission(isDemoMode: boolean = true) {
+    if (isDemoMode) {
+      return { success: true, message: 'Mission restarted [DEMO]' }
+    }
+    const response = await controlClient.post('/api/mission/restart')
     return response.data
   },
 

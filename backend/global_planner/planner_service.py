@@ -130,6 +130,7 @@ class GlobalPlannerService:
         self,
         environment: Environment,
         config: Optional[PlannerConfig] = None,
+        preserve_waypoint_order: bool = False,
     ) -> PlannedRoute:
         """Execute full hierarchical planning: A* grid pathfinder -> GA -> 2-Opt -> Validation."""
         cfg = config if config is not None else self.config
@@ -153,13 +154,28 @@ class GlobalPlannerService:
         # Step 4: Initialize 2-Opt Optimizer
         two_opt = TwoOptOptimizer(fitness_calculator=fitness_calc, config=cfg.two_opt)
 
-        # Step 5: Execute Genetic Algorithm
-        ga = GeneticAlgorithm(
-            fitness_calculator=fitness_calc,
-            config=cfg.genetic_algorithm,
-            two_opt_optimizer=two_opt,
-        )
-        ga_result: GAResult = ga.run()
+        # Step 5: Execute Genetic Algorithm (or preserve explicit user order)
+        if preserve_waypoint_order and len(monitoring_wps) > 0:
+            user_seq = list(range(len(monitoring_wps)))
+            cost, is_feasible, _ = fitness_calc.evaluate_chromosome(user_seq)
+            fitness = fitness_calc.cost_to_fitness(cost)
+            ga_result = GAResult(
+                success=is_feasible,
+                best_chromosome=user_seq,
+                best_cost=cost,
+                is_feasible=is_feasible,
+                fitness_history=[fitness],
+                best_cost_history=[cost],
+                generations_completed=1,
+                two_opt_improvements=0,
+            )
+        else:
+            ga = GeneticAlgorithm(
+                fitness_calculator=fitness_calc,
+                config=cfg.genetic_algorithm,
+                two_opt_optimizer=two_opt,
+            )
+            ga_result = ga.run()
 
         # Step 6: Reconstruct Full Continuous Path Geometry
         ordered_waypoints: List[Waypoint] = []

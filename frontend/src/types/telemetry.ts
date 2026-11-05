@@ -9,6 +9,7 @@ export type FlightState =
   | 'RTL'
   | 'LANDING'
   | 'LANDED'
+  | 'ERROR'
   | 'EMERGENCY'
 
 export type DangerLevel = 'SAFE' | 'WARNING' | 'CRITICAL'
@@ -19,6 +20,9 @@ export interface TelemetryPacket {
     x: number
     y: number
     z: number
+    lat?: number
+    lon?: number
+    alt?: number
   }
   velocity: {
     vx: number
@@ -46,6 +50,7 @@ export interface TelemetryPacket {
   safety_intervention: boolean
   safety_reason?: string
   battery_pct?: number
+  fuzzy_rule_memberships?: Record<string, number>
 }
 
 export interface TelemetryHistoryRecord {

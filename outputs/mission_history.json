@@ -1,0 +1,17 @@
+[
+  {
+    "mission_id": "test_mission_9999",
+    "timestamp": "2026-11-04 19:00:00",
+    "nav_mode": "TD3_WITH_FUZZY_SAFETY",
+    "success": true,
+    "planned_distance_m": 294.85,
+    "actual_distance_m": 282.08,
+    "planned_time_sec": 84.2,
+    "actual_time_sec": 81.1,
+    "avoidance_interventions": 12,
+    "collision_count": 0,
+    "satisfaction_status": "SATISFIED",
+    "optimization_attempts": 1,
+    "user_feedback": ""
+  }
+]

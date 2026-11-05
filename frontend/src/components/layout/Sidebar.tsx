@@ -2,11 +2,12 @@ import React from 'react'
 import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard,
-  Sliders,
   Route,
   Navigation,
   ShieldAlert,
   BarChart3,
+  History,
+  Sliders,
   GitCompare,
   Settings,
   Compass,
@@ -21,6 +22,7 @@ const navItems = [
   { name: 'Live UAV Monitoring', path: '/monitoring', icon: Navigation },
   { name: 'Safety & Obstacles', path: '/safety', icon: ShieldAlert },
   { name: 'Mission Analytics', path: '/analytics', icon: BarChart3 },
+  { name: 'Mission History', path: '/history', icon: History },
   { name: 'Experiment Comparison', path: '/comparison', icon: GitCompare },
   { name: 'Settings', path: '/settings', icon: Settings },
 ]
@@ -37,10 +39,10 @@ export const Sidebar: React.FC = () => {
         </div>
         <div>
           <h1 className="text-xs font-bold tracking-wider text-slate-100 uppercase">
-            Wildlife UAV
+            India UAV GCS
           </h1>
           <p className="text-[10px] text-sky-400 font-mono tracking-tight font-medium">
-            HIERARCHICAL NAV
+            WILDLIFE NAVIGATION
           </p>
         </div>
       </div>
@@ -99,11 +101,15 @@ export const Sidebar: React.FC = () => {
         </div>
         <div className="flex justify-between">
           <span>LOCAL RL:</span>
-          <span className="text-slate-400">TD3 Policy</span>
+          <span className="text-slate-400">TD3 Policy [12-dim]</span>
         </div>
         <div className="flex justify-between">
           <span>SAFETY:</span>
-          <span className="text-slate-400">Adaptive Fuzzy</span>
+          <span className="text-slate-400">Adaptive Fuzzy [Sugeno]</span>
+        </div>
+        <div className="flex justify-between">
+          <span>MAP:</span>
+          <span className="text-emerald-400">India WGS-84 Leaflet</span>
         </div>
       </div>
     </aside>

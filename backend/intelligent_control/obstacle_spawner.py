@@ -486,26 +486,30 @@ class AirSimObstacleSpawner:
 
     def _spawn_single_spec(self, raw_client: Any, spec: SpawnedActorSpec) -> str:
         """Spawn a single `SpawnedActorSpec` via `simSpawnObject` and verify its presence."""
-        import airsim
-
         if not is_project_owned_object(spec.object_name):
             raise ObstacleSpawnError(
                 f"Refusing to spawn object '{spec.object_name}' without '{PROJECT_OBSTACLE_PREFIX}' prefix."
             )
 
-        pose = airsim.Pose(
-            airsim.Vector3r(
-                float(spec.ned_position[0]),
-                float(spec.ned_position[1]),
-                float(spec.ned_position[2]),
-            ),
-            airsim.to_quaternion(0.0, 0.0, float(spec.yaw_rad)),
-        )
-        scale = airsim.Vector3r(
-            float(spec.ned_scale[0]),
-            float(spec.ned_scale[1]),
-            float(spec.ned_scale[2]),
-        )
+        try:
+            import airsim
+
+            pose = airsim.Pose(
+                airsim.Vector3r(
+                    float(spec.ned_position[0]),
+                    float(spec.ned_position[1]),
+                    float(spec.ned_position[2]),
+                ),
+                airsim.to_quaternion(0.0, 0.0, float(spec.yaw_rad)),
+            )
+            scale = airsim.Vector3r(
+                float(spec.ned_scale[0]),
+                float(spec.ned_scale[1]),
+                float(spec.ned_scale[2]),
+            )
+        except ImportError:
+            pose = (spec.ned_position, (0.0, 0.0, float(spec.yaw_rad)))
+            scale = spec.ned_scale
         spawned_name = raw_client.simSpawnObject(
             spec.object_name,
             spec.asset_name,

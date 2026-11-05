@@ -8,6 +8,7 @@ import { LiveMonitoringPage } from './pages/LiveMonitoringPage'
 import { SafetyMonitoringPage } from './pages/SafetyMonitoringPage'
 import { MissionAnalyticsPage } from './pages/MissionAnalyticsPage'
 import { ExperimentComparisonPage } from './pages/ExperimentComparisonPage'
+import { MissionHistoryPage } from './pages/MissionHistoryPage'
 import { SettingsPage } from './pages/SettingsPage'
 
 export const App: React.FC = () => {
@@ -16,11 +17,12 @@ export const App: React.FC = () => {
       <Routes>
         <Route path="/" element={<DashboardLayout />}>
           <Route index element={<OverviewPage />} />
-          <Route path="mission-config" element={<MissionConfigurationPage />} />
           <Route path="planner" element={<GlobalPlannerPage />} />
           <Route path="monitoring" element={<LiveMonitoringPage />} />
           <Route path="safety" element={<SafetyMonitoringPage />} />
           <Route path="analytics" element={<MissionAnalyticsPage />} />
+          <Route path="history" element={<MissionHistoryPage />} />
+          <Route path="mission-config" element={<MissionConfigurationPage />} />
           <Route path="comparison" element={<ExperimentComparisonPage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />

@@ -2,6 +2,8 @@ export interface Point3D {
   x: number
   y: number
   z: number
+  lat?: number
+  lon?: number
 }
 
 export interface MonitoringWaypoint extends Point3D {
@@ -17,6 +19,9 @@ export interface CircularObstacle {
   y: number
   z: number
   radius: number
+  lat?: number
+  lon?: number
+  radius_m?: number
 }
 
 export interface RectangularObstacle {
@@ -27,6 +32,8 @@ export interface RectangularObstacle {
   max_x: number
   max_y: number
   z: number
+  lat?: number
+  lon?: number
 }
 
 export type StaticObstacle = CircularObstacle | RectangularObstacle

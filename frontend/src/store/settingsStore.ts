@@ -16,8 +16,8 @@ interface SettingsState {
   resetDefaults: () => void
 }
 
-const defaultGlobalApi = import.meta.env.VITE_GLOBAL_API_URL || 'http://localhost:8000'
 const defaultControlApi = import.meta.env.VITE_CONTROL_API_URL || 'http://localhost:8001'
+const defaultGlobalApi = import.meta.env.VITE_GLOBAL_API_URL || defaultControlApi
 const defaultWsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:8001/ws/telemetry'
 const defaultDemoMode = import.meta.env.VITE_DEMO_MODE !== 'false'
 

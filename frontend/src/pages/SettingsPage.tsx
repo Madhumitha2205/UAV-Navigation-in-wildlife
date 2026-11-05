@@ -36,9 +36,10 @@ export const SettingsPage: React.FC = () => {
 
   const handleReset = () => {
     resetDefaults()
-    setFormGlobalApi('http://localhost:8000')
-    setFormControlApi('http://localhost:8001')
-    setFormWsUrl('ws://localhost:8001/ws/telemetry')
+    const defaults = useSettingsStore.getState()
+    setFormGlobalApi(defaults.globalApiUrl)
+    setFormControlApi(defaults.controlApiUrl)
+    setFormWsUrl(defaults.wsUrl)
   }
 
   return (
@@ -127,7 +128,7 @@ export const SettingsPage: React.FC = () => {
                 type="text"
                 value={formGlobalApi}
                 onChange={(e) => setFormGlobalApi(e.target.value)}
-                placeholder="http://localhost:8000"
+                placeholder="http://localhost:8001"
                 className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 focus:border-sky-500 focus:outline-none"
               />
               <span className="text-[10px] text-slate-500 font-sans mt-0.5 block">

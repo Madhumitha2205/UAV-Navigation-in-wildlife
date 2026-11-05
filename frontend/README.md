@@ -89,7 +89,7 @@ Configure backend URLs in `.env` (or copy from `.env.example`):
 
 ```bash
 # Global Route Planning API (GA + 2-Opt + A*)
-VITE_GLOBAL_API_URL=http://localhost:8000
+VITE_GLOBAL_API_URL=http://localhost:8001
 
 # Local Controller & AirSim Safety API (TD3 + AFL)
 VITE_CONTROL_API_URL=http://localhost:8001
@@ -101,6 +101,8 @@ VITE_WS_URL=ws://localhost:8001/ws/telemetry
 VITE_DEMO_MODE=true
 ```
 
+The repository's unified Flask server provides both planner and controller routes on port `8001`. Set `VITE_GLOBAL_API_URL` only when using a separate planner service.
+
 ---
 
 ## 5. Standalone Demo Mode vs. Live Backend Mode
@@ -111,7 +113,7 @@ VITE_DEMO_MODE=true
 | **Route Generation** | Simulates GA search with latency (~800ms) and mock route | Real HTTP call `POST /api/planner/plan` |
 | **Telemetry Stream** | Internal tick generator advances UAV along waypoints at 2Hz | Real WebSocket stream (`ws://.../ws/telemetry`) |
 | **Safety Events** | Interactive demonstration of TD3 vs AFL adjustments | Actual AFL safety supervisor telemetry events |
-| **Simulator Commands** | Local mock status toggles | Calls `POST /api/mission/*` and `POST /api/simulation/*` |
+| **Simulator Commands** | Local mock status toggles | Requires a reachable AirSim simulator for live missions; calls `POST /api/mission/*` and `POST /api/simulation/*` |
 | **Failure Handling** | Self-contained, zero external dependency | Reports connection offline status truthfully |
 
 You can toggle between **Demo Mode** and **Live Mode** at any moment via the button in the top navigation bar or the **Settings** page.
